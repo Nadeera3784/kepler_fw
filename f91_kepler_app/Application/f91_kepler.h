@@ -1,11 +1,10 @@
 /******************************************************************************
 
- @file  simple_peripheral.h
+ @file  f91_kepler.h
 
- @brief This file contains the Simple Peripheral sample application
+ @brief This file contains the F91 Kepler Smart Watch application
         definitions and prototypes.
 
- Group: WCS, BTS
  Target Device: cc2640r2
 
  ******************************************************************************
@@ -45,8 +44,8 @@
  
  *****************************************************************************/
 
-#ifndef SIMPLEPERIPHERAL_H
-#define SIMPLEPERIPHERAL_H
+#ifndef F91KEPLER_H
+#define F91KEPLER_H
 
 #ifdef __cplusplus
 extern "C"
@@ -65,6 +64,8 @@ extern "C"
  * CONSTANTS
  */
 
+#define GAP_DEVICE_NAME_LEN_KEPLER        14
+
 /*********************************************************************
  * MACROS
  */
@@ -74,9 +75,9 @@ extern "C"
  */
 
 /*
- * Task creation function for the Simple Peripheral.
+ * Task creation function for F91 Kepler Smart Watch.
  */
-extern void SimplePeripheral_createTask(void);
+extern void F91Kepler_createTask(void);
 
 
 /*********************************************************************
@@ -86,4 +87,4 @@ extern void SimplePeripheral_createTask(void);
 }
 #endif
 
-#endif /* SIMPLEPERIPHERAL_H */
+#endif /* F91KEPLER_H */

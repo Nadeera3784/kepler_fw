@@ -60,7 +60,7 @@
 #include "hal_assert.h"
 #include "bcomdef.h"
 #include "peripheral.h"
-#include "simple_peripheral.h"
+#include "f91_kepler.h"
 
 /* Header files required to enable instruction fetch cache */
 #include <inc/hw_memmap.h>
@@ -214,7 +214,7 @@ int main()
   /* Kick off profile - Priority 3 */
   GAPRole_createTask();
 
-  SimplePeripheral_createTask();
+  F91Kepler_createTask();
 
   /* enable interrupts and start SYS/BIOS */
   BIOS_start();
