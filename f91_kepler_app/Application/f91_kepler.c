@@ -210,27 +210,14 @@ Char sbpTaskStack[SBP_TASK_STACK_SIZE];
 static uint8_t scanRspData[] =
 {
   // complete name
-  0x14,   // length of this data
+  0x07,   // length of this data
   GAP_ADTYPE_LOCAL_NAME_COMPLETE,
+  'F',
+  '9',
+  '1',
+  '-',
   'S',
-  'i',
-  'm',
-  'p',
-  'l',
-  'e',
-  'B',
-  'L',
-  'E',
-  'P',
-  'e',
-  'r',
-  'i',
-  'p',
-  'h',
-  'e',
-  'r',
-  'a',
-  'l',
+  'W',
 
   // connection interval range
   0x05,   // length of this data
