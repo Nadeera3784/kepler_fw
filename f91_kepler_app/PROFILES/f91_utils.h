@@ -1,15 +1,14 @@
 /******************************************************************************
 
- @file  f91_kepler.h
+ @file  f91_utils.h
 
- @brief This file contains the F91 Kepler Smart Watch application
-        definitions and prototypes.
+ @brief Utilities for F91 Kepler services
 
- Target Device: cc2640r2
+ Target Device: CC2640
 
  ******************************************************************************
- 
- Copyright (c) 2013-2021, Texas Instruments Incorporated
+
+ Copyright (c) 2012-2018, Texas Instruments Incorporated
  All rights reserved.
 
  Redistribution and use in source and binary forms, with or without
@@ -40,61 +39,25 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  ******************************************************************************
- 
- 
+ Release Name: ble_sdk_2_02_02_25
+ Release Date: 2018-04-02 18:03:35
  *****************************************************************************/
 
-#ifndef F91KEPLER_H
-#define F91KEPLER_H
+#ifndef F91_UTILS_H
+#define F91_UTILS_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-/*********************************************************************
- * INCLUDES
- */
-
-/*********************************************************************
-*  EXTERNAL VARIABLES
-*/
-
-/*********************************************************************
- * CONSTANTS
- */
-
-#define GAP_DEVICE_NAME_LEN_KEPLER        14
-
-// Service ID's for internal application use
-#define SERVICE_ID_NOTIFICATION      1
-
-
+#include "gatt.h"
 
 /*********************************************************************
  * MACROS
  */
 
-/*********************************************************************
+// F91-Kepler Base 128-bit UUID: FA35XXXX-7989-11EB-9439-0242AC130002
+#define F91_BASE_UUID_128(uuid) 0x02, 0x00, 0x13, 0xAC, 0x42, 0x02, 0x39, 0x94, \
+                0xEB, 0x11, 0x89, 0x79, LO_UINT16(uuid), HI_UINT16(uuid), 0x35, 0xFA
+
+/*-------------------------------------------------------------------
  * FUNCTIONS
  */
 
-/*
- * Task creation function for F91 Kepler Smart Watch.
- */
-extern void F91Kepler_createTask(void);
-
-/*
- * Function to call when a characteristic value has changed
- */
-extern void F91Kepler_notificationCharValueChangeCB(uint8_t paramID);
-
-
-/*********************************************************************
-*********************************************************************/
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* F91KEPLER_H */
+#endif /* F91_UTILS_H */

@@ -66,7 +66,6 @@
 #include "icall_ble_api.h"
 
 #include "devinfoservice.h"
-#include "simple_gatt_profile.h"
 #include "ll_common.h"
 
 #include "peripheral.h"
@@ -80,6 +79,10 @@
 #include "board.h"
 
 #include "f91_kepler.h"
+#include "f91_notification.h"
+#include "f91_notification_service.h"
+
+
 
 /*********************************************************************
  * CONSTANTS
@@ -114,47 +117,47 @@
 #define DEFAULT_CONN_PAUSE_PERIPHERAL         6
 
 // How often to perform periodic event (in msec)
-#define SBP_PERIODIC_EVT_PERIOD               5000
+#define F91_PERIODIC_EVT_PERIOD               5000
 
 // Application specific event ID for HCI Connection Event End Events
-#define SBP_HCI_CONN_EVT_END_EVT              0x0001
+#define F91_HCI_CONN_EVT_END_EVT              0x0001
 
 // Type of Display to open
 #if !defined(Display_DISABLE_ALL)
   #if defined(BOARD_DISPLAY_USE_LCD) && (BOARD_DISPLAY_USE_LCD!=0)
-    #define SBP_DISPLAY_TYPE Display_Type_LCD
+    #define F91_DISPLAY_TYPE Display_Type_LCD
   #elif defined (BOARD_DISPLAY_USE_UART) && (BOARD_DISPLAY_USE_UART!=0)
-    #define SBP_DISPLAY_TYPE Display_Type_UART
+    #define F91_DISPLAY_TYPE Display_Type_UART
   #else // !BOARD_DISPLAY_USE_LCD && !BOARD_DISPLAY_USE_UART
-    #define SBP_DISPLAY_TYPE 0 // Option not supported
+    #define F91_DISPLAY_TYPE 0 // Option not supported
   #endif // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
 #else // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
-  #define SBP_DISPLAY_TYPE 0 // No Display
+  #define F91_DISPLAY_TYPE 0 // No Display
 #endif // !Display_DISABLE_ALL
 
 // Task configuration
-#define SBP_TASK_PRIORITY                     1
+#define F91_TASK_PRIORITY                     1
 
-#ifndef SBP_TASK_STACK_SIZE
-#define SBP_TASK_STACK_SIZE                   644
+#ifndef F91_TASK_STACK_SIZE
+#define F91_TASK_STACK_SIZE                   644
 #endif
 
 // Application events
-#define SBP_STATE_CHANGE_EVT                  0x0001
-#define SBP_CHAR_CHANGE_EVT                   0x0002
-#define SBP_PAIRING_STATE_EVT                 0x0004
-#define SBP_PASSCODE_NEEDED_EVT               0x0008
-#define SBP_CONN_EVT                          0x0010
+#define F91_STATE_CHANGE_EVT                  0x0001
+#define F91_NOTIFICATION_CHAR_CHANGE_EVT      0x0002
+#define F91_PAIRING_STATE_EVT                 0x0004
+#define F91_PASSCODE_NEEDED_EVT               0x0008
+#define F91_CONN_EVT                          0x0010
 
 // Internal Events for RTOS application
-#define SBP_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
-#define SBP_QUEUE_EVT                         UTIL_QUEUE_EVENT_ID // Event_Id_30
-#define SBP_PERIODIC_EVT                      Event_Id_00
+#define F91_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
+#define F91_QUEUE_EVT                         UTIL_QUEUE_EVENT_ID // Event_Id_30
+#define F91_PERIODIC_EVT                      Event_Id_00
 
 // Bitwise OR of all events to pend on
-#define SBP_ALL_EVENTS                        (SBP_ICALL_EVT        | \
-                                               SBP_QUEUE_EVT        | \
-                                               SBP_PERIODIC_EVT)
+#define F91_ALL_EVENTS                        (F91_ICALL_EVT        | \
+                                               F91_QUEUE_EVT        | \
+                                               F91_PERIODIC_EVT)
 
 
 // Set the register cause to the registration bit-mask
@@ -175,7 +178,7 @@ typedef struct
 {
   appEvtHdr_t hdr;  // event header.
   uint8_t *pData;  // event data
-} sbpEvt_t;
+} f91Evt_t;
 
 /*********************************************************************
  * GLOBAL VARIABLES
@@ -204,7 +207,7 @@ static Queue_Handle appMsgQueue;
 
 // Task configuration
 Task_Struct sbpTask;
-Char sbpTaskStack[SBP_TASK_STACK_SIZE];
+Char sbpTaskStack[F91_TASK_STACK_SIZE];
 
 // Scan response data (max size = 31 bytes)
 static uint8_t scanRspData[] =
@@ -248,8 +251,8 @@ static uint8_t advertData[] =
   // in this peripheral
   0x03,   // length of this data
   GAP_ADTYPE_16BIT_MORE,      // some of the UUID's, but not all
-  LO_UINT16(SIMPLEPROFILE_SERV_UUID),
-  HI_UINT16(SIMPLEPROFILE_SERV_UUID)
+  LO_UINT16(F91_NOTIFICATION_SERVICE_UUID),
+  HI_UINT16(F91_NOTIFICATION_SERVICE_UUID)
 };
 
 // GAP GATT Attributes
@@ -265,10 +268,9 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1);
 
 static uint8_t F91Kepler_processStackMsg(ICall_Hdr *pMsg);
 static uint8_t F91Kepler_processGATTMsg(gattMsgEvent_t *pMsg);
-static void F91Kepler_processAppMsg(sbpEvt_t *pMsg);
+static void F91Kepler_processAppMsg(f91Evt_t *pMsg);
 static void F91Kepler_processStateChangeEvt(gaprole_States_t newState);
 static void F91Kepler_processCharValueChangeEvt(uint8_t paramID);
-static void F91Kepler_performPeriodicTask(void);
 static void F91Kepler_clockHandler(UArg arg);
 
 static void F91Kepler_passcodeCB(uint8_t *deviceAddr,
@@ -281,10 +283,8 @@ static void F91Kepler_processPairState(uint8_t state, uint8_t status);
 static void F91Kepler_processPasscode(uint8_t uiOutputs);
 
 static void F91Kepler_stateChangeCB(gaprole_States_t newState);
-static void F91Kepler_charValueChangeCB(uint8_t paramID);
 static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                               uint8_t *pData);
-
 static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport);
 static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport);
 
@@ -313,13 +313,6 @@ static gapBondCBs_t f91Kepler_BondMgrCBs =
   F91Kepler_passcodeCB,  // Passcode callback
   F91Kepler_pairStateCB  // Pairing / Bonding state Callback
 };
-
-// Simple GATT Profile Callbacks
-static simpleProfileCBs_t F91Kepler_simpleProfileCBs =
-{
-  F91Kepler_charValueChangeCB // Simple GATT Characteristic value change callback
-};
-
 /*********************************************************************
  * PUBLIC FUNCTIONS
  */
@@ -407,8 +400,8 @@ void F91Kepler_createTask(void)
   // Configure task
   Task_Params_init(&taskParams);
   taskParams.stack = sbpTaskStack;
-  taskParams.stackSize = SBP_TASK_STACK_SIZE;
-  taskParams.priority = SBP_TASK_PRIORITY;
+  taskParams.stackSize = F91_TASK_STACK_SIZE;
+  taskParams.priority = F91_TASK_PRIORITY;
 
   Task_construct(&sbpTask, F91Kepler_taskFxn, &taskParams, NULL);
 }
@@ -461,9 +454,9 @@ static void F91Kepler_init(void)
 
   // Create one-shot clocks for internal periodic events.
   Util_constructClock(&periodicClock, F91Kepler_clockHandler,
-                      SBP_PERIODIC_EVT_PERIOD, 0, false, SBP_PERIODIC_EVT);
+                      F91_PERIODIC_EVT_PERIOD, 0, false, F91_PERIODIC_EVT);
 
-  dispHandle = Display_open(SBP_DISPLAY_TYPE, NULL);
+  dispHandle = Display_open(F91_DISPLAY_TYPE, NULL);
 
   // Set GAP Parameters: After a connection was established, delay in seconds
   // before sending when GAPRole_SetParameter(GAPROLE_PARAM_UPDATE_ENABLE,...)
@@ -558,29 +551,10 @@ static void F91Kepler_init(void)
   GGS_AddService(GATT_ALL_SERVICES);           // GAP GATT Service
   GATTServApp_AddService(GATT_ALL_SERVICES);   // GATT Service
   DevInfo_AddService();                        // Device Information Service
-  SimpleProfile_AddService(GATT_ALL_SERVICES); // Simple GATT Profile
 
-  // Setup the SimpleProfile Characteristic Values
-  // For more information, see the sections in the User's Guide:
-  // http://software-dl.ti.com/lprf/sdg-latest/html/
-  {
-    uint8_t charValue1 = 1;
-    uint8_t charValue2 = 2;
-    uint8_t charValue3 = 3;
-    uint8_t charValue4 = 4;
-    uint8_t charValue5[SIMPLEPROFILE_CHAR5_LEN] = { 1, 2, 3, 4, 5 };
-
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR1, sizeof(uint8_t),
-                               &charValue1);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR2, sizeof(uint8_t),
-                               &charValue2);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR3, sizeof(uint8_t),
-                               &charValue3);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR4, sizeof(uint8_t),
-                               &charValue4);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR5, SIMPLEPROFILE_CHAR5_LEN,
-                               charValue5);
-  }
+  // Modules
+  Display_print0(dispHandle, 0, 0, "Starting F91 Notification module.");
+  F91Notificaton_init();
 
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
@@ -588,9 +562,6 @@ static void F91Kepler_init(void)
   // these function calls before the GAPRole_StartDevice use.
   // (because Both cases are updating the gapRole_IRK & gapRole_SRK variables).
   VOID GAPRole_StartDevice(&F91Kepler_gapRoleCBs);
-
-  // Register callback with SimpleGATTprofile
-  SimpleProfile_RegisterAppCBs(&F91Kepler_simpleProfileCBs);
 
   // Start Bond Manager and register callback
   VOID GAPBondMgr_Register(&f91Kepler_BondMgrCBs);
@@ -647,7 +618,7 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1)
     // Waits for an event to be posted associated with the calling thread.
     // Note that an event associated with a thread is posted when a
     // message is queued to the message receive queue of the thread
-    events = Event_pend(syncEvent, Event_Id_NONE, SBP_ALL_EVENTS,
+    events = Event_pend(syncEvent, Event_Id_NONE, F91_ALL_EVENTS,
                         ICALL_TIMEOUT_FOREVER);
 
     if (events)
@@ -680,11 +651,11 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1)
       }
 
       // If RTOS queue is not empty, process app message.
-      if (events & SBP_QUEUE_EVT)
+      if (events & F91_QUEUE_EVT)
       {
         while (!Queue_empty(appMsgQueue))
         {
-          sbpEvt_t *pMsg = (sbpEvt_t *)Util_dequeueMsg(appMsgQueue);
+          f91Evt_t *pMsg = (f91Evt_t *)Util_dequeueMsg(appMsgQueue);
           if (pMsg)
           {
             // Process message.
@@ -696,13 +667,13 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1)
         }
       }
 
-      if (events & SBP_PERIODIC_EVT)
+      if (events & F91_PERIODIC_EVT)
       {
         Util_startClock(&periodicClock);
-
-        // Perform periodic application task
-        F91Kepler_performPeriodicTask();
       }
+
+      // Process event if available
+      F91Notificaton_processEvent();
     }
   }
 }
@@ -879,25 +850,26 @@ static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport)
  *
  * @return  None.
  */
-static void F91Kepler_processAppMsg(sbpEvt_t *pMsg)
+static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
 {
+  Display_print1(dispHandle, 2, 0, "GOT AN APP MSG, TYPE IS: : %d", (uint16_t)pMsg->hdr.event);
   switch (pMsg->hdr.event)
   {
-    case SBP_STATE_CHANGE_EVT:
+    case F91_STATE_CHANGE_EVT:
       {
         F91Kepler_processStateChangeEvt((gaprole_States_t)pMsg->
                                                 hdr.state);
       }
       break;
 
-    case SBP_CHAR_CHANGE_EVT:
+    case F91_NOTIFICATION_CHAR_CHANGE_EVT:
       {
         F91Kepler_processCharValueChangeEvt(pMsg->hdr.state);
       }
       break;
 
     // Pairing event
-    case SBP_PAIRING_STATE_EVT:
+    case F91_PAIRING_STATE_EVT:
       {
         F91Kepler_processPairState(pMsg->hdr.state, *pMsg->pData);
 
@@ -906,7 +878,7 @@ static void F91Kepler_processAppMsg(sbpEvt_t *pMsg)
       }
 
     // Passcode event
-    case SBP_PASSCODE_NEEDED_EVT:
+    case F91_PASSCODE_NEEDED_EVT:
       {
         F91Kepler_processPasscode(*pMsg->pData);
 
@@ -914,7 +886,7 @@ static void F91Kepler_processAppMsg(sbpEvt_t *pMsg)
         break;
       }
 
-	case SBP_CONN_EVT:
+	case F91_CONN_EVT:
       {
         F91Kepler_processConnEvt((Gap_ConnEventRpt_t *)(pMsg->pData));
 
@@ -939,7 +911,7 @@ static void F91Kepler_processAppMsg(sbpEvt_t *pMsg)
  */
 static void F91Kepler_stateChangeCB(gaprole_States_t newState)
 {
-  F91Kepler_enqueueMsg(SBP_STATE_CHANGE_EVT, newState, NULL);
+  F91Kepler_enqueueMsg(F91_STATE_CHANGE_EVT, newState, NULL);
 }
 
 /*********************************************************************
@@ -1120,18 +1092,18 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
 }
 
 /*********************************************************************
- * @fn      F91Kepler_charValueChangeCB
+ * @fn      F91Kepler_notificationCharValueChangeCB
  *
- * @brief   Callback from Simple Profile indicating a characteristic
+ * @brief   Callback indicating a characteristic
  *          value change.
  *
  * @param   paramID - parameter ID of the value that was changed.
  *
  * @return  None.
  */
-static void F91Kepler_charValueChangeCB(uint8_t paramID)
+void F91Kepler_notificationCharValueChangeCB(uint8_t paramID)
 {
-  F91Kepler_enqueueMsg(SBP_CHAR_CHANGE_EVT, paramID, 0);
+  F91Kepler_enqueueMsg(F91_NOTIFICATION_CHAR_CHANGE_EVT, paramID, 0);
 }
 
 /*********************************************************************
@@ -1150,52 +1122,12 @@ static void F91Kepler_processCharValueChangeEvt(uint8_t paramID)
 
   switch(paramID)
   {
-    case SIMPLEPROFILE_CHAR1:
-      SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR1, &newValue);
-
-      Display_print1(dispHandle, 4, 0, "Char 1: %d", (uint16_t)newValue);
-      break;
-
-    case SIMPLEPROFILE_CHAR3:
-      SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR3, &newValue);
-
-      Display_print1(dispHandle, 4, 0, "Char 3: %d", (uint16_t)newValue);
-      break;
-
     default:
       // should not reach here!
       break;
   }
 }
 
-/*********************************************************************
- * @fn      F91Kepler_performPeriodicTask
- *
- * @brief   Perform a periodic application task. This function gets called
- *          every five seconds (SBP_PERIODIC_EVT_PERIOD). In this example,
- *          the value of the third characteristic in the SimpleGATTProfile
- *          service is retrieved from the profile, and then copied into the
- *          value of the the fourth characteristic.
- *
- * @param   None.
- *
- * @return  None.
- */
-static void F91Kepler_performPeriodicTask(void)
-{
-  uint8_t valueToCopy;
-
-  // Call to retrieve the value of the third characteristic in the profile
-  if (SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR3, &valueToCopy) == SUCCESS)
-  {
-    // Call to set that value of the fourth characteristic in the profile.
-    // Note that if notifications of the fourth characteristic have been
-    // enabled by a GATT client device, then a notification will be sent
-    // every time this function is called.
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR4, sizeof(uint8_t),
-                               &valueToCopy);
-  }
-}
 
 /*********************************************************************
  * @fn      F91Kepler_pairStateCB
@@ -1215,7 +1147,7 @@ static void F91Kepler_pairStateCB(uint16_t connHandle, uint8_t state,
     *pData = status;
 
     // Queue the event.
-    F91Kepler_enqueueMsg(SBP_PAIRING_STATE_EVT, state, pData);
+    F91Kepler_enqueueMsg(F91_PAIRING_STATE_EVT, state, pData);
   }
 }
 
@@ -1284,7 +1216,7 @@ static void F91Kepler_passcodeCB(uint8_t *deviceAddr,
     *pData = uiOutputs;
 
     // Enqueue the event.
-    F91Kepler_enqueueMsg(SBP_PASSCODE_NEEDED_EVT, 0, pData);
+    F91Kepler_enqueueMsg(F91_PASSCODE_NEEDED_EVT, 0, pData);
   }
 }
 
@@ -1339,7 +1271,7 @@ static void F91Kepler_clockHandler(UArg arg)
 static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport)
 {
   // Enqueue the event for processing in the app context.
-  if( F91Kepler_enqueueMsg(SBP_CONN_EVT, 0 ,(uint8_t *) pReport) == FALSE)
+  if( F91Kepler_enqueueMsg(F91_CONN_EVT, 0 ,(uint8_t *) pReport) == FALSE)
   {
     ICall_free(pReport);
   }
@@ -1359,7 +1291,7 @@ static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport)
 static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                            uint8_t *pData)
 {
-  sbpEvt_t *pMsg = ICall_malloc(sizeof(sbpEvt_t));
+  f91Evt_t *pMsg = ICall_malloc(sizeof(f91Evt_t));
 
   // Create dynamic pointer to message.
   if (pMsg)
