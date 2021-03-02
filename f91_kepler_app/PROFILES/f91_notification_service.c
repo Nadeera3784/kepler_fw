@@ -62,6 +62,7 @@
  */
 
 #define SERVAPP_NUM_ATTR_SUPPORTED       10
+#define MAX_CONTACT_LENGTH               11
 
 /*********************************************************************
  * TYPEDEFS
@@ -120,7 +121,7 @@ static uint8 f91NotificationServiceChar1 = 0;
 static uint8 f91NotificationServiceUserDesp1[21] = "F91 Notification Bar";
 
 // F91 Notification Characteristic 2 Properties
-static uint8 f91NotificationServiceChar2Props = GATT_PROP_READ | GATT_PROP_WRITE;
+static uint8 f91NotificationServiceChar2Props = GATT_PROP_WRITE;
 
 // Characteristic 2 Value
 static uint8 f91NotificationServiceChar2 = 0;
@@ -129,7 +130,7 @@ static uint8 f91NotificationServiceChar2 = 0;
 static uint8 f91NotificationServiceUserDesp2[18] = "F91 Incoming Call";
 
 // F91 Notification Characteristic 3 Properties
-static uint8 f91NotificationServiceChar3Props = GATT_PROP_READ | GATT_PROP_WRITE;
+static uint8 f91NotificationServiceChar3Props = GATT_PROP_WRITE;
 
 // Characteristic 3 Value
 static uint8 f91NotificationServiceChar3 = 0;
@@ -182,7 +183,7 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
       // Characteristic Value 2
       {
         { ATT_UUID_SIZE, f91_notification_serviceChar2UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_WRITE,
         0,
         &f91NotificationServiceChar2
       },
@@ -203,7 +204,7 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
       // Characteristic Value 3
       {
         { ATT_UUID_SIZE, f91_notification_serviceChar3UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_WRITE,
         0,
         &f91NotificationServiceChar3
       },

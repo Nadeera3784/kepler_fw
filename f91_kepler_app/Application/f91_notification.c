@@ -33,14 +33,10 @@
  * CONSTANTS  
  */
 // Events
-// Events
-#define NOTIFICATION_CHANGED_EVT            (1 << 0)
 
 /*********************************************************************
  * TYPEDEFS
  */
-
-static f91_notification_serviceCBs_t *testCB = NULL;
 /*********************************************************************
  * GLOBAL VARIABLES
  */
@@ -66,6 +62,15 @@ static f91_notification_serviceCBs_t F91Notificaton_StateChangeCB =
 /*********************************************************************
  * LOCAL VARIABLES
  */
+
+static struct {
+  bool email;
+  bool text;
+  bool voicemail;
+  bool missedcall;
+  char * incoming_call;
+  char * incoming_text;
+} current_notifications;
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -93,19 +98,41 @@ void F91Notificaton_init(void)
   F91_notification_service_AddService();
   F91_notification_service_RegisterAppCBs(&F91Notificaton_StateChangeCB);
   ssd1306_init();
+  F91Notificaton_reset();
+  F91Notificaton_Update(NOTIFICATION_BAR);
 }
 
 /*********************************************************************
  * @fn      F91Notificaton_processCharChangeEvt
  *
- * @brief   F91 notification event handling
+ * @brief   F91 notification handling
  *
- * @param   event - event identifier
+ * @param   paramID - char identifier
  *
  */
-void F91Notificaton_processCharChangeEvt(uint8_t event)
+void F91Notificaton_processCharChangeEvt(uint8_t paramID)
 {
-
+  uint8_t incoming_notifications;
+  switch (paramID)
+  {
+    case F91_NOTIFICATION_SERVICE_CHAR1:
+      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR1, &incoming_notifications);
+      F91Notificaton_SetNotification(NOTIFICATION_BAR, incoming_notifications);
+      F91Notificaton_Update(NOTIFICATION_BAR);
+      break;
+    case F91_NOTIFICATION_SERVICE_CHAR2:
+      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR2, &incoming_notifications);
+      F91Notificaton_SetNotification(NOTIFICATION_CALL, incoming_notifications);
+      F91Notificaton_Update(NOTIFICATION_CALL);
+      break;
+    case F91_NOTIFICATION_SERVICE_CHAR3:
+      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR3, &incoming_notifications);
+      F91Notificaton_SetNotification(NOTIFICATION_TEXT, incoming_notifications);
+      F91Notificaton_Update(NOTIFICATION_TEXT);
+      break;
+    default:
+      break;
+  }
 }
 
 /*********************************************************************
@@ -133,7 +160,12 @@ void F91Notificaton_processEvent(void)
  */
 void F91Notificaton_reset(void)
 {
-
+  current_notifications.email         = false;
+  current_notifications.text          = false;
+  current_notifications.voicemail     = false;
+  current_notifications.missedcall    = false;
+  current_notifications.incoming_call = "";
+  current_notifications.incoming_text = "";
 }
 
 /*********************************************************************
@@ -145,9 +177,34 @@ void F91Notificaton_reset(void)
  *
  * @return  None.
  */
-void F91Notificaton_SetNotification(uint8_t notification)
+void F91Notificaton_SetNotification(uint8_t type, uint8_t notification)
 {
-
+  if ( type == NOTIFICATION_BAR ) {
+    if (notification & (1<<EMAIL)) {
+      current_notifications.email = true;
+    } else {
+      current_notifications.email = false;
+    }
+    if (notification & (1<<TEXT)) {
+      current_notifications.text  = true;
+    } else {
+      current_notifications.text  = false;
+    }
+    if (notification & (1<<VOICEMAIL)) {
+      current_notifications.voicemail = true;
+    } else {
+      current_notifications.voicemail = false;
+    }
+    if (notification & (1<<MISSEDCALL)) {
+      current_notifications.missedcall = true;
+    } else {
+      current_notifications.missedcall = false;
+    }
+  } else if ( type == NOTIFICATION_CALL ) {
+    current_notifications.incoming_call = (char*) notification;
+  } else if ( type == NOTIFICATION_TEXT ) {
+    current_notifications.incoming_text = (char*) notification;
+  }
 }
 
 /*********************************************************************
@@ -157,9 +214,38 @@ void F91Notificaton_SetNotification(uint8_t notification)
  *
  * @return  None.
  */
-void F91Notificaton_Update(void)
+void F91Notificaton_Update(uint8_t type)
 {
+  if (type == NOTIFICATION_BAR) {
+    if (current_notifications.email) {
+      ssd1306_display_notification(EMAIL, 0, 0, false);
+    } else {
+      ssd1306_display_notification(EMAIL, 0, 0, true);
+    }
+    if (current_notifications.text) {
+      ssd1306_display_notification(TEXT, 14, 0, false);
+    } else {
+      ssd1306_display_notification(TEXT, 14, 0, true);
+    }
+    if (current_notifications.voicemail) {
+      ssd1306_display_notification(VOICEMAIL, 29, 0, false);
+    } else {
+      ssd1306_display_notification(VOICEMAIL, 29, 0, true);
+    }
+    if (current_notifications.missedcall) {
+      ssd1306_display_notification(MISSEDCALL, 44, 0, false);
+    } else {
+      ssd1306_display_notification(MISSEDCALL, 44, 0, true);
+    }
+  } else if (type == NOTIFICATION_CALL) {
+    ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    ssd1306_display_full_notification(INCOMING_CALL, current_notifications.incoming_call);
+  } else if (type == NOTIFICATION_TEXT) {
+    ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    ssd1306_display_full_notification(INCOMING_TEXT, current_notifications.incoming_text);
+  }
 
+  ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
 }
 
 /*********************************************************************

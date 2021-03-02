@@ -270,7 +270,7 @@ static uint8_t F91Kepler_processStackMsg(ICall_Hdr *pMsg);
 static uint8_t F91Kepler_processGATTMsg(gattMsgEvent_t *pMsg);
 static void F91Kepler_processAppMsg(f91Evt_t *pMsg);
 static void F91Kepler_processStateChangeEvt(gaprole_States_t newState);
-static void F91Kepler_processCharValueChangeEvt(uint8_t paramID);
+static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t paramID);
 static void F91Kepler_clockHandler(UArg arg);
 
 static void F91Kepler_passcodeCB(uint8_t *deviceAddr,
@@ -864,7 +864,7 @@ static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
 
     case F91_NOTIFICATION_CHAR_CHANGE_EVT:
       {
-        F91Kepler_processCharValueChangeEvt(pMsg->hdr.state);
+        F91Kepler_processCharValueChangeEvt(SERVICE_ID_NOTIFICATION, pMsg->hdr.state);
       }
       break;
 
@@ -1116,14 +1116,15 @@ void F91Kepler_notificationCharValueChangeCB(uint8_t paramID)
  *
  * @return  None.
  */
-static void F91Kepler_processCharValueChangeEvt(uint8_t paramID)
+static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t paramID)
 {
-  uint8_t newValue;
-
-  switch(paramID)
+    uint8_t incoming_notifications;
+  switch (serviceID)
   {
+    case SERVICE_ID_NOTIFICATION:
+      F91Notificaton_processCharChangeEvt(paramID);
+      break;
     default:
-      // should not reach here!
       break;
   }
 }

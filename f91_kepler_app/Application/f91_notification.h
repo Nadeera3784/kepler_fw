@@ -30,6 +30,11 @@ extern "C"
  * CONSTANTS
  */
 
+#define NOTIFICATION_BAR   0x01
+#define NOTIFICATION_CALL  0x02
+#define NOTIFICATION_TEXT  0x04
+
+
 /*********************************************************************
  * MACROS
  */
@@ -61,12 +66,12 @@ extern void F91Notificaton_reset(void);
 /*
  * Set specific notification
  */
-extern void F91Notificaton_SetNotification(uint8_t notification);
+extern void F91Notificaton_SetNotification(uint8_t type, uint8_t notification);
 
 /*
  * Update notifications
  */
-extern void F91Notificaton_Update(void);
+extern void F91Notificaton_Update(uint8_t type);
 
 
 /*********************************************************************
