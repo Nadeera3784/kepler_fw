@@ -73,6 +73,9 @@ extern "C"
 
 #define NINEONENOTIFICATION_SERVICE                    0x00000010
 
+#define CONTACT_STREAM_LEN                             11
+#define CONTACT_STREAM_LEN_MIN                         0
+
 
 /*********************************************************************
  * TYPEDEFS
@@ -106,7 +109,7 @@ typedef struct
  *          GATT attributes with the GATT server.
  *
  */
-extern bStatus_t F91_notification_service_AddService( void );
+extern bStatus_t F91_notification_service_AddService( Display_Handle logger );
 
 /*
  * F91_notification_service_RegisterAppCBs - Registers the application callback function.
@@ -126,7 +129,7 @@ extern bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_servi
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-extern bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, void *value );
+extern bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t len, void *value );
 
 /*
  * F91_notification_service_GetParameter - Get a F91_notification_service parameter.
@@ -137,8 +140,7 @@ extern bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, 
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-extern bStatus_t F91_notification_service_GetParameter( uint8 param, void *value );
-
+extern bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value );
 /*********************************************************************
 *********************************************************************/
 

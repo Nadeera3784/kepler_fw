@@ -93,9 +93,9 @@ static struct {
  *
  * @return  none
  */
-void F91Notificaton_init(void)
+void F91Notificaton_init(Display_Handle logger)
 {
-  F91_notification_service_AddService();
+  F91_notification_service_AddService(logger);
   F91_notification_service_RegisterAppCBs(&F91Notificaton_StateChangeCB);
   ssd1306_init();
   F91Notificaton_reset();
@@ -112,6 +112,7 @@ void F91Notificaton_init(void)
  */
 void F91Notificaton_processCharChangeEvt(uint8_t paramID)
 {
+  static uint8_t received_string[CONTACT_STREAM_LEN] = {0};
   uint8_t incoming_notifications;
   switch (paramID)
   {
@@ -121,14 +122,17 @@ void F91Notificaton_processCharChangeEvt(uint8_t paramID)
       F91Notificaton_Update(NOTIFICATION_BAR);
       break;
     case F91_NOTIFICATION_SERVICE_CHAR2:
-      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR2, &incoming_notifications);
-      F91Notificaton_SetNotification(NOTIFICATION_CALL, incoming_notifications);
+      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR2, &received_string);
+      F91Notificaton_SetFullNotification(NOTIFICATION_CALL, (char*) received_string);
       F91Notificaton_Update(NOTIFICATION_CALL);
+    
+      memset(received_string, 0, CONTACT_STREAM_LEN); //reset the string array.
       break;
     case F91_NOTIFICATION_SERVICE_CHAR3:
-      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR3, &incoming_notifications);
-      F91Notificaton_SetNotification(NOTIFICATION_TEXT, incoming_notifications);
+      F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR3, &received_string);
+      F91Notificaton_SetFullNotification(NOTIFICATION_TEXT, (char*) received_string);
       F91Notificaton_Update(NOTIFICATION_TEXT);
+      memset(received_string, 0, CONTACT_STREAM_LEN); //reset the string array.
       break;
     default:
       break;
@@ -179,7 +183,6 @@ void F91Notificaton_reset(void)
  */
 void F91Notificaton_SetNotification(uint8_t type, uint8_t notification)
 {
-  if ( type == NOTIFICATION_BAR ) {
     if (notification & (1<<EMAIL)) {
       current_notifications.email = true;
     } else {
@@ -200,10 +203,14 @@ void F91Notificaton_SetNotification(uint8_t type, uint8_t notification)
     } else {
       current_notifications.missedcall = false;
     }
-  } else if ( type == NOTIFICATION_CALL ) {
-    current_notifications.incoming_call = (char*) notification;
+}
+
+void F91Notificaton_SetFullNotification(uint8_t type, char* notification)
+{
+  if ( type == NOTIFICATION_CALL ) {
+    current_notifications.incoming_call = notification;
   } else if ( type == NOTIFICATION_TEXT ) {
-    current_notifications.incoming_text = (char*) notification;
+    current_notifications.incoming_text = notification;
   }
 }
 

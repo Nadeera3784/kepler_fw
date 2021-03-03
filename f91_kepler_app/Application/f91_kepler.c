@@ -554,7 +554,7 @@ static void F91Kepler_init(void)
 
   // Modules
   Display_print0(dispHandle, 0, 0, "Starting F91 Notification module.");
-  F91Notificaton_init();
+  F91Notificaton_init(dispHandle);
 
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
