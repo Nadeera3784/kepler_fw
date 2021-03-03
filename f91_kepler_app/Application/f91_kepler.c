@@ -1118,7 +1118,6 @@ void F91Kepler_notificationCharValueChangeCB(uint8_t paramID)
  */
 static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t paramID)
 {
-    uint8_t incoming_notifications;
   switch (serviceID)
   {
     case SERVICE_ID_NOTIFICATION:

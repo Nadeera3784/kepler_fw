@@ -120,7 +120,7 @@ extern bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_servi
  * F91_notification_service_SetParameter - Set a F91_notification_service parameter.
  *
  *    param - Profile parameter ID
- *    len - length of data to right
+ *    len - length of data to write
  *    value - pointer to data to write.  This is dependent on
  *          the parameter ID and WILL be cast to the appropriate
  *          data type (example: data type of uint16 will be cast to

@@ -79,19 +79,19 @@ CONST uint8_t f91_notification_serviceUUID[ATT_UUID_SIZE] =
 };
 
 // Characteristic 1 UUID: 0xFFF1
-CONST uint8 f91_notification_serviceChar1UUID[ATT_UUID_SIZE] =
+CONST uint8_t f91_notification_serviceChar1UUID[ATT_UUID_SIZE] =
 {
  F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR1_UUID)
 };
 
 // Characteristic 2 UUID: 0xFFF2
-CONST uint8 f91_notification_serviceChar2UUID[ATT_UUID_SIZE] =
+CONST uint8_t f91_notification_serviceChar2UUID[ATT_UUID_SIZE] =
 {
  F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR2_UUID)
 };
 
 // Characteristic 3 UUID: 0xFFF3
-CONST uint8 f91_notification_serviceChar3UUID[ATT_UUID_SIZE] =
+CONST uint8_t f91_notification_serviceChar3UUID[ATT_UUID_SIZE] =
 {
  F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR3_UUID)
 };
@@ -112,31 +112,31 @@ static f91_notification_serviceCBs_t *pNotificationsAppCBs = NULL;
 static CONST gattAttrType_t f91NotificationServiceDecl = { ATT_UUID_SIZE, f91_notification_serviceUUID };
 
 // F91 Notification Characteristic 1 Properties
-static uint8 f91NotificationServiceChar1Props = GATT_PROP_READ | GATT_PROP_WRITE;
+static uint8_t f91NotificationServiceChar1Props = GATT_PROP_READ | GATT_PROP_WRITE;
 
 // Characteristic 1 Value
-static uint8 f91NotificationServiceChar1 = 0;
+static uint8_t f91NotificationServiceChar1 = 0;
 
 // F91 Characteristic 1 User Description
-static uint8 f91NotificationServiceUserDesp1[21] = "F91 Notification Bar";
+static uint8_t f91NotificationServiceUserDesp1[21] = "F91 Notification Bar";
 
 // F91 Notification Characteristic 2 Properties
-static uint8 f91NotificationServiceChar2Props = GATT_PROP_WRITE;
+static uint8_t f91NotificationServiceChar2Props = GATT_PROP_WRITE;
 
 // Characteristic 2 Value
-static uint8 f91NotificationServiceChar2 = 0;
+static uint8_t f91NotificationServiceChar2 = 0;
 
 // F91 Characteristic 2 User Description
-static uint8 f91NotificationServiceUserDesp2[18] = "F91 Incoming Call";
+static uint8_t f91NotificationServiceUserDesp2[18] = "F91 Incoming Call";
 
 // F91 Notification Characteristic 3 Properties
-static uint8 f91NotificationServiceChar3Props = GATT_PROP_WRITE;
+static uint8_t f91NotificationServiceChar3Props = GATT_PROP_WRITE;
 
 // Characteristic 3 Value
-static uint8 f91NotificationServiceChar3 = 0;
+static uint8_t f91NotificationServiceChar3 = 0;
 
 // F91 Characteristic 3 User Description
-static uint8 f91NotificationServiceUserDesp3[18] = "F91 Incoming Text";
+static uint8_t f91NotificationServiceUserDesp3[18] = "F91 Incoming Text";
 
 
 /*********************************************************************
@@ -221,11 +221,11 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
  * LOCAL FUNCTIONS
  */
 static bStatus_t f91_notification_service_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
-                                           uint8 *pValue, uint16 *pLen, uint16 offset,
-                                           uint16 maxLen, uint8 method );
+                                           uint8_t *pValue, uint16 *pLen, uint16 offset,
+                                           uint16 maxLen, uint8_t method );
 static bStatus_t f91_notification_service_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
-                                            uint8 *pValue, uint16 len, uint16 offset,
-                                            uint8 method );
+                                            uint8_t *pValue, uint16 len, uint16 offset,
+                                            uint8_t method );
 
 /*********************************************************************
  * PROFILE CALLBACKS
@@ -290,15 +290,15 @@ bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_serviceCBs_t
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, void *value )
+bStatus_t F91_notification_service_SetParameter( uint8_t param, uint8_t len, void *value )
 {
   bStatus_t ret = SUCCESS;
   switch ( param )
   {
     case F91_NOTIFICATION_SERVICE_CHAR1:
-      if ( len == sizeof ( uint8 ) )
+      if ( len == sizeof ( uint8_t ) )
       {
-        f91NotificationServiceChar1 = *((uint8*)value);
+        f91NotificationServiceChar1 = *((uint8_t*)value);
       }
       else
       {
@@ -306,9 +306,9 @@ bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, void *v
       }
       break;
     case F91_NOTIFICATION_SERVICE_CHAR2:
-      if ( len == sizeof ( uint8 ) )
+      if ( len == sizeof ( uint8_t ) )
       {
-        f91NotificationServiceChar2 = *((uint8*)value);
+        f91NotificationServiceChar2 = *((uint8_t*)value);
       }
       else
       {
@@ -316,9 +316,9 @@ bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, void *v
       }
       break;
     case F91_NOTIFICATION_SERVICE_CHAR3:
-      if ( len == sizeof ( uint8 ) )
+      if ( len == sizeof ( uint8_t ) )
       {
-        f91NotificationServiceChar3 = *((uint8*)value);
+        f91NotificationServiceChar3 = *((uint8_t*)value);
       }
       else
       {
@@ -342,19 +342,19 @@ bStatus_t F91_notification_service_SetParameter( uint8 param, uint8 len, void *v
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-bStatus_t F91_notification_service_GetParameter( uint8 param, void *value )
+bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value )
 {
   bStatus_t ret = SUCCESS;
   switch ( param )
   {
     case F91_NOTIFICATION_SERVICE_CHAR1:
-          *((uint8*)value) = f91NotificationServiceChar1;
+          *((uint8_t*)value) = f91NotificationServiceChar1;
       break;
     case F91_NOTIFICATION_SERVICE_CHAR2:
-          *((uint8*)value) = f91NotificationServiceChar2;
+          *((uint8_t*)value) = f91NotificationServiceChar2;
       break;
     case F91_NOTIFICATION_SERVICE_CHAR3:
-          *((uint8*)value) = f91NotificationServiceChar3;
+          *((uint8_t*)value) = f91NotificationServiceChar3;
       break;
     default:
       ret = INVALIDPARAMETER;
@@ -380,8 +380,8 @@ bStatus_t F91_notification_service_GetParameter( uint8 param, void *value )
  * @return      SUCCESS, blePending or Failure
  */
 static bStatus_t f91_notification_service_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
-                                       uint8 *pValue, uint16 *pLen, uint16 offset,
-                                       uint16 maxLen, uint8 method )
+                                       uint8_t *pValue, uint16 *pLen, uint16 offset,
+                                       uint16 maxLen, uint8_t method )
 {
   bStatus_t status = SUCCESS;
 
@@ -425,28 +425,28 @@ static bStatus_t f91_notification_service_ReadAttrCB( uint16 connHandle, gattAtt
  * @return  SUCCESS, blePending or Failure
  */
 static bStatus_t f91_notification_service_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
-                                        uint8 *pValue, uint16 len, uint16 offset,
-                                        uint8 method )
+                                        uint8_t *pValue, uint16 len, uint16 offset,
+                                        uint8_t method )
 {
   bStatus_t status = SUCCESS;
-  uint8 notifyApp = 0xFF;
+  uint8_t notifyApp = 0xFF;
 
   if ( pAttr->type.len == ATT_UUID_SIZE ) {
       // 128-bit UUID
       if (!memcmp(pAttr->type.uuid, f91_notification_serviceChar1UUID, ATT_UUID_SIZE)) {
-          uint8 *pCurValue = (uint8 *)pAttr->pValue;
+          uint8_t *pCurValue = (uint8_t *)pAttr->pValue;
           *pCurValue = pValue[0];
           if( pAttr->pValue == &f91NotificationServiceChar1 ) {
             notifyApp = F91_NOTIFICATION_SERVICE_CHAR1;
           }
       } else if(!memcmp(pAttr->type.uuid, f91_notification_serviceChar2UUID, ATT_UUID_SIZE)) {
-          uint8 *pCurValue = (uint8 *)pAttr->pValue;
+          uint8_t *pCurValue = (uint8_t *)pAttr->pValue;
           *pCurValue = pValue[0];
           if( pAttr->pValue == &f91NotificationServiceChar2 ) {
             notifyApp = F91_NOTIFICATION_SERVICE_CHAR2;
           }
       } else if(!memcmp(pAttr->type.uuid, f91_notification_serviceChar3UUID, ATT_UUID_SIZE)) {
-          uint8 *pCurValue = (uint8 *)pAttr->pValue;
+          uint8_t *pCurValue = (uint8_t *)pAttr->pValue;
           *pCurValue = pValue[0];
           if( pAttr->pValue == &f91NotificationServiceChar3 ) {
             notifyApp = F91_NOTIFICATION_SERVICE_CHAR3;
