@@ -53,6 +53,7 @@
 #include <ti/sysbios/knl/Event.h>
 #include <ti/sysbios/knl/Queue.h>
 #include <ti/display/Display.h>
+#include <ti/sysbios/BIOS.h>
 
 #if defined( USE_FPGA ) || defined( DEBUG_SW_TRACE )
 #include <driverlib/ioc.h>
@@ -81,7 +82,8 @@
 #include "f91_kepler.h"
 #include "f91_notification.h"
 #include "f91_notification_service.h"
-
+#include "f91_utils.h"
+#include "ssd1306.h"
 
 
 /*********************************************************************
@@ -122,21 +124,8 @@
 // Application specific event ID for HCI Connection Event End Events
 #define F91_HCI_CONN_EVT_END_EVT              0x0001
 
-// Type of Display to open
-#if !defined(Display_DISABLE_ALL)
-  #if defined(BOARD_DISPLAY_USE_LCD) && (BOARD_DISPLAY_USE_LCD!=0)
-    #define F91_DISPLAY_TYPE Display_Type_LCD
-  #elif defined (BOARD_DISPLAY_USE_UART) && (BOARD_DISPLAY_USE_UART!=0)
-    #define F91_DISPLAY_TYPE Display_Type_UART
-  #else // !BOARD_DISPLAY_USE_LCD && !BOARD_DISPLAY_USE_UART
-    #define F91_DISPLAY_TYPE 0 // Option not supported
-  #endif // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
-#else // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
-  #define F91_DISPLAY_TYPE 0 // No Display
-#endif // !Display_DISABLE_ALL
-
 // Task configuration
-#define F91_TASK_PRIORITY                     1
+#define F91_TASK_PRIORITY                     2
 
 #ifndef F91_TASK_STACK_SIZE
 #define F91_TASK_STACK_SIZE                   644
@@ -206,8 +195,8 @@ static Queue_Struct appMsg;
 static Queue_Handle appMsgQueue;
 
 // Task configuration
-Task_Struct sbpTask;
-Char sbpTaskStack[F91_TASK_STACK_SIZE];
+Task_Struct f91Task;
+Char f91TaskStack[F91_TASK_STACK_SIZE];
 
 // Scan response data (max size = 31 bytes)
 static uint8_t scanRspData[] =
@@ -287,8 +276,6 @@ static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                               uint8_t *pData);
 static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport);
 static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport);
-
-
 
 /*********************************************************************
  * EXTERN FUNCTIONS
@@ -399,11 +386,11 @@ void F91Kepler_createTask(void)
 
   // Configure task
   Task_Params_init(&taskParams);
-  taskParams.stack = sbpTaskStack;
+  taskParams.stack = f91TaskStack;
   taskParams.stackSize = F91_TASK_STACK_SIZE;
   taskParams.priority = F91_TASK_PRIORITY;
 
-  Task_construct(&sbpTask, F91Kepler_taskFxn, &taskParams, NULL);
+  Task_construct(&f91Task, F91Kepler_taskFxn, &taskParams, NULL);
 }
 
 /*********************************************************************
@@ -456,7 +443,11 @@ static void F91Kepler_init(void)
   Util_constructClock(&periodicClock, F91Kepler_clockHandler,
                       F91_PERIODIC_EVT_PERIOD, 0, false, F91_PERIODIC_EVT);
 
-  dispHandle = Display_open(F91_DISPLAY_TYPE, NULL);
+  
+
+  Display_init();
+  F91_LOGGER = Display_open(Display_Type_UART, NULL);
+  Display_print0(F91_LOGGER, 7, 0, ">>>LOGGER INITIALIZED<<<");
 
   // Set GAP Parameters: After a connection was established, delay in seconds
   // before sending when GAPRole_SetParameter(GAPROLE_PARAM_UPDATE_ENABLE,...)
@@ -552,9 +543,8 @@ static void F91Kepler_init(void)
   GATTServApp_AddService(GATT_ALL_SERVICES);   // GATT Service
   DevInfo_AddService();                        // Device Information Service
 
-  // Modules
-  Display_print0(dispHandle, 0, 0, "Starting F91 Notification module.");
-  F91Notificaton_init(dispHandle);
+  //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Notification module.");
+  F91Notificaton_init();
 
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
@@ -593,7 +583,7 @@ static void F91Kepler_init(void)
   HCI_LE_ReadLocalSupportedFeaturesCmd();
 #endif // !defined (USE_LL_CONN_PARAM_UPDATE)
 
-  Display_print0(dispHandle, 0, 0, "BLE Peripheral");
+  Display_print0(F91_LOGGER, 0, 0, "F91 Smart Watch");
 }
 
 /*********************************************************************
@@ -620,7 +610,7 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1)
     // message is queued to the message receive queue of the thread
     events = Event_pend(syncEvent, Event_Id_NONE, F91_ALL_EVENTS,
                         ICALL_TIMEOUT_FOREVER);
-
+    
     if (events)
     {
       ICall_EntityID dest;
@@ -800,12 +790,12 @@ static uint8_t F91Kepler_processGATTMsg(gattMsgEvent_t *pMsg)
     // The app is informed in case it wants to drop the connection.
 
     // Display the opcode of the message that caused the violation.
-    Display_print1(dispHandle, 5, 0, "FC Violated: %d", pMsg->msg.flowCtrlEvt.opcode);
+    Display_print1(F91_LOGGER, 5, 0, "FC Violated: %d", pMsg->msg.flowCtrlEvt.opcode);
   }
   else if (pMsg->method == ATT_MTU_UPDATED_EVENT)
   {
     // MTU size updated
-    Display_print1(dispHandle, 5, 0, "MTU Size: %d", pMsg->msg.mtuEvt.MTU);
+    Display_print1(F91_LOGGER, 5, 0, "MTU Size: %d", pMsg->msg.mtuEvt.MTU);
   }
 
   // Free message payload. Needed only for ATT Protocol messages
@@ -852,7 +842,6 @@ static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport)
  */
 static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
 {
-  Display_print1(dispHandle, 2, 0, "GOT AN APP MSG, TYPE IS: : %d", (uint16_t)pMsg->hdr.event);
   switch (pMsg->hdr.event)
   {
     case F91_STATE_CHANGE_EVT:
@@ -955,8 +944,8 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
         DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
 
         // Display device address
-        Display_print0(dispHandle, 1, 0, Util_convertBdAddr2Str(ownAddress));
-        Display_print0(dispHandle, 2, 0, "Initialized");
+        Display_print0(F91_LOGGER, 1, 0, Util_convertBdAddr2Str(ownAddress));
+        Display_print0(F91_LOGGER, 2, 0, "Initialized");
 
         // Device starts advertising upon initialization of GAP
         uint8_t initialAdvertEnable = TRUE;
@@ -967,7 +956,7 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_ADVERTISING:
-      Display_print0(dispHandle, 2, 0, "Advertising");
+      Display_print0(F91_LOGGER, 2, 0, "Advertising");
       break;
 
 #ifdef PLUS_BROADCASTER
@@ -1010,8 +999,8 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
         // connection
         if ( linkDB_GetInfo( numActive - 1, &linkInfo ) == SUCCESS )
         {
-          Display_print1(dispHandle, 2, 0, "Num Conns: %d", (uint16_t)numActive);
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(linkInfo.addr));
+          Display_print1(F91_LOGGER, 2, 0, "Num Conns: %d", (uint16_t)numActive);
+          Display_print0(F91_LOGGER, 3, 0, Util_convertBdAddr2Str(linkInfo.addr));
         }
         else
         {
@@ -1019,8 +1008,8 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
 
           GAPRole_GetParameter(GAPROLE_CONN_BD_ADDR, peerAddress);
 
-          Display_print0(dispHandle, 2, 0, "Connected");
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(peerAddress));
+          Display_print0(F91_LOGGER, 2, 0, "Connected");
+          Display_print0(F91_LOGGER, 3, 0, Util_convertBdAddr2Str(peerAddress));
         }
 
         #ifdef PLUS_BROADCASTER
@@ -1048,7 +1037,7 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_CONNECTED_ADV:
-      Display_print0(dispHandle, 2, 0, "Connected Advertising");
+      Display_print0(F91_LOGGER, 2, 0, "Connected Advertising");
       break;
 
     case GAPROLE_WAITING:
@@ -1059,20 +1048,20 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
         attRsp_freeAttRsp(bleNotConnected);
 
         // Clear remaining lines
-        Display_clearLines(dispHandle, 3, 5);
+        Display_clearLines(F91_LOGGER, 3, 5);
         
         GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8_t), &advertReEnable);
-        Display_print0(dispHandle, 2, 0, "Advertising");
+        Display_print0(F91_LOGGER, 2, 0, "Advertising");
       }
       break;
 
     case GAPROLE_WAITING_AFTER_TIMEOUT:
       attRsp_freeAttRsp(bleNotConnected);
 
-      Display_print0(dispHandle, 2, 0, "Timed Out");
+      Display_print0(F91_LOGGER, 2, 0, "Timed Out");
 
       // Clear remaining lines
-      Display_clearLines(dispHandle, 3, 5);
+      Display_clearLines(F91_LOGGER, 3, 5);
 
       #ifdef PLUS_BROADCASTER
         // Reset flag for next connection.
@@ -1081,11 +1070,11 @@ static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_ERROR:
-      Display_print0(dispHandle, 2, 0, "Error");
+      Display_print0(F91_LOGGER, 2, 0, "Error");
       break;
 
     default:
-      Display_clearLine(dispHandle, 2);
+      Display_clearLine(F91_LOGGER, 2);
       break;
   }
 
@@ -1162,35 +1151,35 @@ static void F91Kepler_processPairState(uint8_t state, uint8_t status)
 {
   if (state == GAPBOND_PAIRING_STATE_STARTED)
   {
-    Display_print0(dispHandle, 2, 0, "Pairing started");
+    Display_print0(F91_LOGGER, 2, 0, "Pairing started");
   }
   else if (state == GAPBOND_PAIRING_STATE_COMPLETE)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Pairing success");
+      Display_print0(F91_LOGGER, 2, 0, "Pairing success");
     }
     else
     {
-      Display_print1(dispHandle, 2, 0, "Pairing fail: %d", status);
+      Display_print1(F91_LOGGER, 2, 0, "Pairing fail: %d", status);
     }
   }
   else if (state == GAPBOND_PAIRING_STATE_BONDED)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Bonding success");
+      Display_print0(F91_LOGGER, 2, 0, "Bonding success");
     }
   }
   else if (state == GAPBOND_PAIRING_STATE_BOND_SAVED)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Bond save success");
+      Display_print0(F91_LOGGER, 2, 0, "Bond save success");
     }
     else
     {
-      Display_print1(dispHandle, 2, 0, "Bond save failed: %d", status);
+      Display_print1(F91_LOGGER, 2, 0, "Bond save failed: %d", status);
     }
   }
 }
@@ -1236,7 +1225,7 @@ static void F91Kepler_processPasscode(uint8_t uiOutputs)
   // Display passcode to user
   if (uiOutputs != 0)
   {
-    Display_print1(dispHandle, 4, 0, "Passcode: %d", passcode);
+    Display_print1(F91_LOGGER, 4, 0, "Passcode: %d", passcode);
   }
 
   uint16_t connectionHandle;

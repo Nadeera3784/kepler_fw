@@ -4,7 +4,7 @@
  * Description:    This file contains the f91_notification_service service definitions and
  *                 prototypes.
  *
- * Copyright (c) 2015-2016, Texas Instruments Incorporated
+ * Copyright (c) 2015-2021, Texas Instruments Incorporated
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -109,7 +109,7 @@ typedef struct
  *          GATT attributes with the GATT server.
  *
  */
-extern bStatus_t F91_notification_service_AddService( Display_Handle logger );
+extern bStatus_t F91_notification_service_AddService(void);
 
 /*
  * F91_notification_service_RegisterAppCBs - Registers the application callback function.

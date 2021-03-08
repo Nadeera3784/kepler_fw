@@ -1,15 +1,12 @@
 #include "ssd1306.h"
 #include "fonts_icons.h"
 #include "font_5x7.h"
+#include "f91_utils.h"
 
 #include <ti/display/Display.h>
 #include <ti/drivers/GPIO.h>
 #include <ti/drivers/I2C.h>
 
-#include <time.h>
-#include <ti/sysbios/hal/Seconds.h>
-
-#include <stdint.h>
 
 #include "Board.h"
 
@@ -18,27 +15,21 @@ uint8_t command_buffer[2];
 uint8_t txBuffer[1];
 uint8_t rxBuffer[2];
 uint8_t ssd1306_display_buffer[481];
+bool displayInitialized = false;
 
 I2C_Handle              i2c_connection;
 I2C_Params              i2c_params;
 I2C_Transaction         i2c_transaction;
-Display_Handle   ssd_logger;
+
 
 
 void ssd1306_init(void) {//Init Sequence
-    GPIO_init();
-    I2C_init();
-
     /* Create I2C for usage */
     I2C_Params_init(&i2c_params);
     i2c_params.bitRate = I2C_400kHz;
     i2c_connection = I2C_open(Board_I2C0, &i2c_params);
     if (i2c_connection == NULL) {
-        // Display_printf(ssd_logger, 0, 0, "Error Initializing I2C\n");
         while (1);
-    }
-    else {
-        // Display_printf(ssd_logger, 0, 0, "I2C Initialized! \n");
     }
 
     i2c_transaction.writeBuf   = txBuffer;
@@ -47,15 +38,11 @@ void ssd1306_init(void) {//Init Sequence
     i2c_transaction.readCount  = 2;
 
     /* Try to connect to OLED. */
-    // Display_printf(ssd_logger, 0, 0, "Trying to Connect to SSD1306 Display through i2c!\n");
     i2c_transaction.slaveAddress = SSD1306_I2C_ADDR;
     if (!I2C_transfer(i2c_connection, &i2c_transaction)) {
         /* Could not resolve a sensor, error */
-        // Display_printf(ssd_logger, 0, 0, "Error. No SSD1306 Display sensor found!, trying again in 5 seconds...");
-        // sleep(5);
+        while(1){}
     } else {
-        // Display_printf(ssd_logger, 0, 0, "Starting init sequence for SSD1306.");
-        // Display_printf(ssd_logger, 0, 0, "Begin ssd1306 init!");
 
         //Set Display to OFF.
         ssd1306_command(SET_DISP_OFF);
@@ -113,12 +100,12 @@ void ssd1306_init(void) {//Init Sequence
 
         //Set Display On
         ssd1306_command(SET_DISP_ON);
-        // Display_printf(ssd_logger, 0, 0, "Init complete!");
+        // //Display_print0(F91_LOGGER, 0, 0, "Init complete!");
 
         ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
         ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+        displayInitialized = true;
     }
-
 } // end ssd1306_init
 
 void ssd1306_command(uint8_t command) {
@@ -130,16 +117,16 @@ void ssd1306_command(uint8_t command) {
 } // end ssd1306_command
 
 void ssd1306_send_buffer(uint8_t *buffer, int size) {
-        i2c_transaction.writeBuf = buffer;
-        i2c_transaction.writeCount = size;
-        i2c_transaction.readBuf = NULL;
-        i2c_transaction.readCount = 0;
-        i2c_transaction.slaveAddress = SSD1306_I2C_ADDR;
-        if (!I2C_transfer(i2c_connection, &i2c_transaction)) {
-           /* Could not send command to SSD1306, error */
-        //    Display_printf(ssd_logger, 0, 0, "Error sending SSD1306 command.\n");
-           while(1);
-       }
+    i2c_transaction.writeBuf = buffer;
+    i2c_transaction.writeCount = size;
+    i2c_transaction.readBuf = NULL;
+    i2c_transaction.readCount = 0;
+    i2c_transaction.slaveAddress = SSD1306_I2C_ADDR;
+    if (!I2C_transfer(i2c_connection, &i2c_transaction)) {
+        /* Could not send command to SSD1306, error */
+        while(1);
+    }
+
 }
 
 void ssd1306_clear_buffer(uint8_t *buffer, int size) {
@@ -148,12 +135,10 @@ void ssd1306_clear_buffer(uint8_t *buffer, int size) {
 
     buffer[0]=0x40;
     ssd1306_set_position(0,0);
-
-    // Display_printf(ssd_logger, 0, 0, "Display Cleared.\n");
 }
 
 void ssd1306_draw_pixel(uint8_t x, uint8_t y, bool erase){
-    ssd1306_display_buffer[0] = 0x40;
+    ssd1306_display_buffer[0] = 0x40; //Command byte.
 
     if(erase){
         ssd1306_display_buffer[1 + x + (y / 8) * 96] &= ~(1 << (y & 7));
@@ -319,3 +304,6 @@ void ssd1306_display_full_notification(uint8_t type, char *text) {
     ssd1306_display_text(text, space, 21, false);
 }
 
+bool ssd1306_isReady() {
+    return displayInitialized;
+}

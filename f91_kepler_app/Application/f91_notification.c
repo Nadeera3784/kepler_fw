@@ -93,13 +93,12 @@ static struct {
  *
  * @return  none
  */
-void F91Notificaton_init(Display_Handle logger)
+void F91Notificaton_init(void)
 {
-  F91_notification_service_AddService(logger);
+  F91_notification_service_AddService();
   F91_notification_service_RegisterAppCBs(&F91Notificaton_StateChangeCB);
-  ssd1306_init();
   F91Notificaton_reset();
-  F91Notificaton_Update(NOTIFICATION_BAR);
+  // F91Notificaton_Update(NOTIFICATION_BAR);
 }
 
 /*********************************************************************
@@ -132,6 +131,7 @@ void F91Notificaton_processCharChangeEvt(uint8_t paramID)
       F91_notification_service_GetParameter(F91_NOTIFICATION_SERVICE_CHAR3, &received_string);
       F91Notificaton_SetFullNotification(NOTIFICATION_TEXT, (char*) received_string);
       F91Notificaton_Update(NOTIFICATION_TEXT);
+
       memset(received_string, 0, CONTACT_STREAM_LEN); //reset the string array.
       break;
     default:
@@ -244,15 +244,14 @@ void F91Notificaton_Update(uint8_t type)
     } else {
       ssd1306_display_notification(MISSEDCALL, 44, 0, true);
     }
-  } else if (type == NOTIFICATION_CALL) {
+  } 
+  else if (type == NOTIFICATION_CALL) {
     ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
     ssd1306_display_full_notification(INCOMING_CALL, current_notifications.incoming_call);
   } else if (type == NOTIFICATION_TEXT) {
     ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
     ssd1306_display_full_notification(INCOMING_TEXT, current_notifications.incoming_text);
   }
-
-  ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
 }
 
 /*********************************************************************

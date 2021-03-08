@@ -46,7 +46,7 @@ extern "C"
 /*
  * Initialize notifications module
  */
-extern void F91Notificaton_init(Display_Handle logger);
+extern void F91Notificaton_init(void);
 
 /*
  * Task Event Processor for characteristic changes

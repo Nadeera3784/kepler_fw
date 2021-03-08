@@ -95,10 +95,6 @@ CONST uint8_t f91_notification_serviceChar3UUID[ATT_UUID_SIZE] =
 {
  F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR3_UUID)
 };
-
-Display_Handle _logger = NULL;
-
-
 /*********************************************************************
  * LOCAL VARIABLES
  */
@@ -256,10 +252,9 @@ CONST gattServiceCBs_t f91_notification_serviceCBs =
  *          GATT attributes with the GATT server.
  *
  */
-bStatus_t F91_notification_service_AddService( Display_Handle logger )
+bStatus_t F91_notification_service_AddService(void)
 {
   uint8_t status;
-  _logger = logger;
   // Register GATT attribute list and CBs with GATT Server App
   status = GATTServApp_RegisterService( f91_notification_serviceAttrTbl,
                                         GATT_NUM_ATTRS( f91_notification_serviceAttrTbl ),

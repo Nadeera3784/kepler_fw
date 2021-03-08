@@ -6,17 +6,8 @@
 #include <ti/drivers/I2C.h>
 #include <ti/display/Display.h>
 
-extern uint8_t buffer[6];
-extern uint8_t command_buffer[2];
-extern uint8_t txBuffer[1];
-extern uint8_t rxBuffer[2];
 extern uint8_t ssd1306_display_buffer[481];
-
-extern I2C_Handle              i2c_connection;
-extern I2C_Params              i2c_params;
-extern I2C_Transaction         i2c_transaction;
-extern Display_Handle   ssd_logger;
-
+extern bool displayInitialized;
 /* ====================================================================
  * Horizontal Centering Number Array
  * ==================================================================== */
@@ -94,5 +85,6 @@ void ssd1306_display_pm( uint8_t x, uint8_t y, bool erase);
 void ssd1306_display_small_number(uint8_t number, uint8_t x, uint8_t y, bool erase);
 void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase);
 void ssd1306_display_full_notification(uint8_t type, char *text);
+bool ssd1306_isReady(void);
 
 #endif /* SSD1306_H_ */

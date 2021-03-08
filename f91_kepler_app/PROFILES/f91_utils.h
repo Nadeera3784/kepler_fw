@@ -47,7 +47,19 @@
 #define F91_UTILS_H
 
 #include "gatt.h"
+#include <ti/display/Display.h>
+#include <ti/sysbios/knl/Semaphore.h>
 
+
+
+/*********************************************************************
+ * GLOBALS
+ */
+
+extern Display_Handle F91_LOGGER;
+
+extern Semaphore_Struct semStruct;
+extern Semaphore_Handle semHandle;
 /*********************************************************************
  * MACROS
  */
