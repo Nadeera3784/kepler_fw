@@ -82,6 +82,8 @@
 #include "f91_kepler.h"
 #include "f91_notification.h"
 #include "f91_notification_service.h"
+#include "f91_clock.h"
+#include "f91_clock_service.h"
 #include "f91_utils.h"
 #include "ssd1306.h"
 
@@ -132,11 +134,12 @@
 #endif
 
 // Application events
-#define F91_STATE_CHANGE_EVT                  0x0001
-#define F91_NOTIFICATION_CHAR_CHANGE_EVT      0x0002
-#define F91_PAIRING_STATE_EVT                 0x0004
-#define F91_PASSCODE_NEEDED_EVT               0x0008
-#define F91_CONN_EVT                          0x0010
+#define F91_STATE_CHANGE_EVT                  (1 << 0)
+#define F91_NOTIFICATION_CHAR_CHANGE_EVT      (1 << 1)
+#define F91_PAIRING_STATE_EVT                 (1 << 2)
+#define F91_PASSCODE_NEEDED_EVT               (1 << 3)
+#define F91_CONN_EVT                          (1 << 4)
+#define F91_CLOCK_CHAR_CHANGE_EVT             (1 << 5)
 
 // Internal Events for RTOS application
 #define F91_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
@@ -546,6 +549,9 @@ static void F91Kepler_init(void)
   //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Notification module.");
   F91Notificaton_init();
 
+  //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Clock module.");
+  F91Clock_init();
+
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
   // function with GAPROLE_IRK or GAPROLE_SRK parameter - Perform
@@ -857,6 +863,12 @@ static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
       }
       break;
 
+    case F91_CLOCK_CHAR_CHANGE_EVT:
+      {
+        F91Kepler_processCharValueChangeEvt(SERVICE_ID_CLOCK, pMsg->hdr.state);
+      }
+      break;
+    
     // Pairing event
     case F91_PAIRING_STATE_EVT:
       {
@@ -1096,6 +1108,21 @@ void F91Kepler_notificationCharValueChangeCB(uint8_t paramID)
 }
 
 /*********************************************************************
+ * @fn      F91Kepler_clockCharValueChangeCB
+ *
+ * @brief   Callback indicating a characteristic
+ *          value change.
+ *
+ * @param   paramID - parameter ID of the value that was changed.
+ *
+ * @return  None.
+ */
+void F91Kepler_clockCharValueChangeCB(uint8_t paramID)
+{
+  F91Kepler_enqueueMsg(F91_CLOCK_CHAR_CHANGE_EVT, paramID, 0);
+}
+
+/*********************************************************************
  * @fn      F91Kepler_processCharValueChangeEvt
  *
  * @brief   Process a pending Simple Profile characteristic value change
@@ -1111,6 +1138,9 @@ static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t param
   {
     case SERVICE_ID_NOTIFICATION:
       F91Notificaton_processCharChangeEvt(paramID);
+      break;
+    case SERVICE_ID_CLOCK:
+      F91Clock_processCharChangeEvt(paramID);
       break;
     default:
       break;

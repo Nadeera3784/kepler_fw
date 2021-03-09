@@ -61,6 +61,8 @@
 
 #include "ssd1306.h"
 #include "f91_utils.h"
+#include "f91_clock.h"
+#include "f91_clock_service.h"
 
 
 /*********************************************************************
@@ -97,20 +99,114 @@ static ICall_SyncHandle syncEvent;
 Task_Struct f91ClockTask;
 Char f91ClockTaskStack[F91_CLOCK_TASK_STACK_SIZE];
 
-
-
 // Event globally used to post local events and pend on system and
 // local events.
 static ICall_SyncHandle syncEvent;
 
+// Time Zone
+static uint16_t TimeZone;
+
+// For clock
+static int lastWrittenHr = 999;
+static int lastWrittenMin = 999;
+static int lastWrittenSec = 999;
+static bool TimeMode = true;
+
+
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
-static void F91Clock_init( void );
+static void F91Clock_internal_init( void );
 static void F91Clock_taskFxn(UArg a0, UArg a1);
 static void F91Clock_doTime(void);
+static void F91Clock_setTime(uint32_t time);
+static void F91Clock_setTimeZone(uint16_t zone);
+static void F91Clock_setTimeMode(uint8_t mode);
+static uint16_t F91Clock_getTimeZone( void );
+static bool F91Clock_getTimeMode( void );
 
 
+/*********************************************************************
+ * @fn      F91Clock_setTime
+ *
+ * @brief   Sets time for the clock
+ *
+ * @param   time - self explanatory.
+ *
+ */
+static void F91Clock_setTime(uint32_t time)
+{
+    Seconds_set(time);
+    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR1, sizeof(uint32_t), &time);
+}
+
+/*********************************************************************
+ * @fn      F91Clock_setTimeZone
+ *
+ * @brief   Sets time zone for the clock
+ *
+ * @param   timezone - self explanatory.
+ *
+ */
+static void F91Clock_setTimeZone(uint16_t zone)
+{
+    TimeZone = zone;
+    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR2, sizeof(uint16_t), &TimeZone);
+}
+
+/*********************************************************************
+ * @fn      F91Clock_setTimeMode
+ *
+ * @brief   Sets time mode for the clock 
+ *
+ * @param   mode - (0: 12hr  1: 24hr).
+ *
+ */
+static void F91Clock_setTimeMode(uint8_t mode)
+{
+    switch ( mode )
+    {
+        case 0:
+            TimeMode = false;
+        break;
+        case 1:
+            TimeMode = true;
+        break;
+        default:
+            mode = 0;
+            TimeMode = false;
+        break;
+    }
+
+    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR3, 1, &mode);
+}
+
+/*********************************************************************
+ * @fn      F91Clock_getTimeZone
+ *
+ * @brief   Returns time zone
+ *
+ * @param   none
+ *
+ */
+static uint16_t F91Clock_getTimeZone( void )
+{
+    return TimeZone;
+}
+
+
+/*********************************************************************
+ * @fn      F91Clock_getTimeZone
+ *
+ * @brief   Returns time zone
+ *
+ * @param   none
+ *
+ */
+static bool F91Clock_getTimeMode( void )
+{
+    return TimeMode;
+}
 
  /*********************************************************************
  * @fn      F91Clock_createTask
@@ -135,7 +231,7 @@ void F91Clock_createTask(void)
 }
 
 /*********************************************************************
- * @fn      F91Clock_init
+ * @fn      F91Clock_internal_init
  *
  * @brief   Called during initialization and contains application
  *          specific initialization (ie. hardware initialization/setup,
@@ -146,7 +242,7 @@ void F91Clock_createTask(void)
  *
  * @return  None.
  */
-static void F91Clock_init(void)
+static void F91Clock_internal_init(void)
 {  
     // Register the current thread as an ICall dispatcher application
     // so that the application can send and receive messages.
@@ -155,39 +251,36 @@ static void F91Clock_init(void)
     // initialize the SSD1306 display. 
     ssd1306_init();
 
-    //**************set default time (01/14/1994) (UTC)************
-    Seconds_set(758505600);
+    //**************set default time & zone (00:00:00 01/14/1994)(UTC) & PST************
+    F91Clock_setTime(DEFAULT_TIME);
+    F91Clock_setTimeZone(TZ_PST);
+    F91Clock_setTimeMode(0);
     //***********************************************************
 }
 
 static void F91Clock_doTime(void) {
     time_t t1;
     struct tm *ltm;
+    bool eraseFirstDigit;
     char *dateString;
     char hour[2];
     char minute[2];
     char second[2];
     char month[2];
     char day[2];
-    bool eraseFirstDigit;
-    bool militaryTime = false;
-    int timezone = 28800;
-    int lastWrittenHr=999; //Default value, something it can't be.
-    int lastWrittenMin=999;
-    int lastWrittenSec=999;
-
+    
     t1 = time(NULL);
-    t1 = t1 - timezone;
+    t1 = t1 - F91Clock_getTimeZone();
     ltm = localtime(&t1);
     eraseFirstDigit = false;
 
-    if((!militaryTime) && (ltm->tm_hour>=13)){
+    if((!F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
         ltm->tm_hour = ltm->tm_hour - 12;
         ssd1306_display_pm(74, 13, false);
-    } else if((!militaryTime) && (ltm->tm_hour == 0)){
+    } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
         ltm->tm_hour = 12;
         ssd1306_display_pm(74, 13, true);
-    } else if((!militaryTime) && (ltm->tm_hour == 12)){
+    } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
         ssd1306_display_pm(74, 13, false);
     } else {
         ssd1306_display_pm(74, 13, true);
@@ -196,9 +289,8 @@ static void F91Clock_doTime(void) {
     ltoa(ltm->tm_hour, hour);
     ltoa(ltm->tm_min, minute);
     ltoa(ltm->tm_sec, second);
-    ltoa(ltm->tm_mon+1, month);
+    ltoa(ltm->tm_mon + 1, month);
     ltoa(ltm->tm_mday, day);
-
 
     dateString = strcat(strcat(month,"/"),day);
     ssd1306_display_semicolon(34, 13, false);
@@ -242,6 +334,28 @@ static void F91Clock_doTime(void) {
 }
 
 /*********************************************************************
+ * EXTERNAL FUNCTIONS
+ */
+
+/*********************************************************************
+ * @fn      F91Clock_StateChangeCB
+ *
+ * @brief   Callback function to be called when clock is changed.
+ *
+ * @return  None.
+ */
+static f91_clock_serviceCBs_t F91Clock_StateChangeCB =
+{
+  F91Kepler_clockCharValueChangeCB
+};
+
+
+/*********************************************************************
+ * PUBLIC FUNCTIONS
+ */
+
+
+/*********************************************************************
  * @fn      F91Clock_taskFxn
  *
  * @brief   Application task entry point for the F91 Clock.
@@ -253,11 +367,60 @@ static void F91Clock_doTime(void) {
 static void F91Clock_taskFxn(UArg a0, UArg a1)
 {
     // Initialize application
-    F91Clock_init();
+    F91Clock_internal_init();
     // Application main loop
     for (;;)
     {   
         F91Clock_doTime();
         Task_sleep(1000 * (1000 / Clock_tickPeriod));
     }
+}
+
+
+/*********************************************************************
+ * @fn      F91Clock_init
+ *
+ * @brief   Initialization function for the clock
+ *
+ * @param   none
+ *
+ * @return  none
+ */
+void F91Clock_init(void)
+{
+  F91_clock_service_AddService();
+  F91_clock_service_RegisterAppCBs(&F91Clock_StateChangeCB);
+}
+
+
+/*********************************************************************
+ * @fn      F91Clock_processCharChangeEvt
+ *
+ * @brief   F91 clock change handling
+ *
+ * @param   paramID - char identifier
+ *
+ */
+void F91Clock_processCharChangeEvt(uint8_t paramID)
+{
+  uint32_t time;
+  uint16_t zone;
+  uint8_t  mode;
+  switch (paramID)
+  {
+    case F91_CLOCK_SERVICE_CHAR1:
+      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR1, &time);
+      F91Clock_setTime(time);
+      break;
+    case F91_CLOCK_SERVICE_CHAR2:
+      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR2, &zone);
+      F91Clock_setTimeZone(zone);
+      break;
+    case F91_CLOCK_SERVICE_CHAR3:
+      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR3, &mode);
+      F91Clock_setTimeMode(mode);
+      break;
+    default:
+      break;
+  }
 }

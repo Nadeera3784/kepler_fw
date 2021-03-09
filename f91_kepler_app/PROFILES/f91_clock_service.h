@@ -1,7 +1,7 @@
 /**********************************************************************************************
- * Filename:       f91_notification_service.h
+ * Filename:       f91_clock_service.h
  *
- * Description:    This file contains the f91_notification_service service definitions and
+ * Description:    This file contains the f91_clock_service service definitions and
  *                 prototypes.
  *
  * Copyright (c) 2015-2021, Texas Instruments Incorporated
@@ -37,8 +37,8 @@
  *************************************************************************************************/
 
 
-#ifndef _F91_NOTIFICATION_SERVICE_H_
-#define _F91_NOTIFICATION_SERVICE_H_
+#ifndef _F91_CLOCK_SERVICE_H_
+#define _F91_CLOCK_SERVICE_H_
 
 #ifdef __cplusplus
 extern "C"
@@ -58,23 +58,17 @@ extern "C"
 */
 
 // Profile Parameters
-#define F91_NOTIFICATION_SERVICE_CHAR1                 0  // RW uint8 - Profile Characteristic 1 value (Notification Bar)
-#define F91_NOTIFICATION_SERVICE_CHAR2                 1  // RW uint8 - Profile Characteristic 2 value (Incoming Call)
-#define F91_NOTIFICATION_SERVICE_CHAR3                 2  // RW uint8 - Profile Characteristic 3 value (Incoming Text)
+#define F91_CLOCK_SERVICE_CHAR1                 0  // RW uint8 - Profile Characteristic 1 value (Time)
+#define F91_CLOCK_SERVICE_CHAR2                 1  // RW uint8 - Profile Characteristic 2 value (Time zone)
+#define F91_CLOCK_SERVICE_CHAR3                 2  // RW uint8 - Profile Characteristic 2 value (Time mode)
 
 // Service UUID
-#define F91_NOTIFICATION_SERVICE_UUID                  0xA2F0
+#define F91_CLOCK_SERVICE_UUID                  0xB2F0
 
 // Characteristic UUID
-#define F91_NOTIFICATION_SERVICE_CHAR1_UUID            0xA2F1
-#define F91_NOTIFICATION_SERVICE_CHAR2_UUID            0xA2F2
-#define F91_NOTIFICATION_SERVICE_CHAR3_UUID            0xA2F3
-
-
-#define NINEONENOTIFICATION_SERVICE                    0x00000010
-
-#define CONTACT_STREAM_LEN                             11
-#define CONTACT_STREAM_LEN_MIN                         0
+#define F91_CLOCK_SERVICE_CHAR1_UUID            0xB2F1
+#define F91_CLOCK_SERVICE_CHAR2_UUID            0xB2F2
+#define F91_CLOCK_SERVICE_CHAR3_UUID            0xB2F3
 
 
 /*********************************************************************
@@ -90,12 +84,12 @@ extern "C"
  */
 
 // Callback when a characteristic value has changed
-typedef void (*f91_notification_serviceChange_t)( uint8 paramID );
+typedef void (*f91_clock_serviceChange_t)( uint8 paramID );
 
 typedef struct
 {
-  f91_notification_serviceChange_t        pfnNotificationChangeCb;  // Called when characteristic value changes
-} f91_notification_serviceCBs_t;
+  f91_clock_serviceChange_t        pfnClockChangeCb;  // Called when characteristic value changes
+} f91_clock_serviceCBs_t;
 
 
 
@@ -105,22 +99,22 @@ typedef struct
 
 
 /*
- * F91_notification_service_AddService- Initializes the F91_notification_service service by registering
+ * F91_clock_service_AddService- Initializes the F91_clock_service service by registering
  *          GATT attributes with the GATT server.
  *
  */
-extern bStatus_t F91_notification_service_AddService(void);
+extern bStatus_t F91_clock_service_AddService(void);
 
 /*
- * F91_notification_service_RegisterAppCBs - Registers the application callback function.
+ * F91_clock_service_RegisterAppCBs - Registers the application callback function.
  *                    Only call this function once.
  *
  *    appCallbacks - pointer to application callbacks.
  */
-extern bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_serviceCBs_t *appCallbacks );
+extern bStatus_t F91_clock_service_RegisterAppCBs( f91_clock_serviceCBs_t *appCallbacks );
 
 /*
- * F91_notification_service_SetParameter - Set a F91_notification_service parameter.
+ * F91_clock_service_SetParameter - Set a F91_clock_service parameter.
  *
  *    param - Profile parameter ID
  *    len - length of data to write
@@ -129,10 +123,10 @@ extern bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_servi
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-extern bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t len, void *value );
+extern bStatus_t F91_clock_service_SetParameter( uint8_t param, uint16_t len, void *value );
 
 /*
- * F91_notification_service_GetParameter - Get a F91_notification_service parameter.
+ * F91_clock_service_GetParameter - Get a F91_clock_service parameter.
  *
  *    param - Profile parameter ID
  *    value - pointer to data to write.  This is dependent on
@@ -140,7 +134,7 @@ extern bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t 
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-extern bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value );
+extern bStatus_t F91_clock_service_GetParameter( uint8_t param, void *value );
 /*********************************************************************
 *********************************************************************/
 
@@ -148,4 +142,4 @@ extern bStatus_t F91_notification_service_GetParameter( uint8_t param, void *val
 }
 #endif
 
-#endif /* _F91_NOTIFICATION_SERVICE_H_ */
+#endif /* _F91_CLOCK_SERVICE_H_ */

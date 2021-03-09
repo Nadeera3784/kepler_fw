@@ -49,7 +49,7 @@
  * EXTERNAL FUNCTIONS
  */
 /*********************************************************************
- * @fn      F91Notificaton_SetNotification
+ * @fn      F91Notificaton_StateChangeCB
  *
  * @brief   Callback function to be called when notifications are changed.
  *

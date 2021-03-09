@@ -68,6 +68,7 @@ extern "C"
 
 // Service ID's for internal application use
 #define SERVICE_ID_NOTIFICATION      1
+#define SERVICE_ID_CLOCK             2
 
 
 
@@ -89,6 +90,10 @@ extern void F91Kepler_createTask(void);
  */
 extern void F91Kepler_notificationCharValueChangeCB(uint8_t paramID);
 
+/*
+ * Function to call when a characteristic value has changed
+ */
+extern void F91Kepler_clockCharValueChangeCB(uint8_t paramID);
 
 /*********************************************************************
 *********************************************************************/

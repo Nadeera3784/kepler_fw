@@ -1,5 +1,5 @@
 /**********************************************************************************************
- * Filename:       f91_notification_service.c
+ * Filename:       f91_clock_service.c
  *
  * Description:    This file contains the implementation of the service.
  *
@@ -52,7 +52,7 @@
 #include "gapbondmgr.h"
 #include "f91_utils.h"
 
-#include "f91_notification_service.h"
+#include "f91_clock_service.h"
 
 /*********************************************************************
  * MACROS
@@ -72,74 +72,68 @@
 * GLOBAL VARIABLES
 */
 
-// f91_notification_service Service UUID
-CONST uint8_t f91_notification_serviceUUID[ATT_UUID_SIZE] =
+// f91_clock_service Service UUID
+CONST uint8_t f91_clock_serviceUUID[ATT_UUID_SIZE] =
 {
-  F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_UUID)
+  F91_BASE_UUID_128(F91_CLOCK_SERVICE_UUID)
 };
 
-// Characteristic 1 UUID: 0xA2F1
-CONST uint8_t f91_notification_serviceChar1UUID[ATT_UUID_SIZE] =
+// Characteristic 1 UUID: 0xB2F1
+CONST uint8_t f91_clock_serviceChar1UUID[ATT_UUID_SIZE] =
 {
- F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR1_UUID)
+ F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR1_UUID)
 };
 
-// Characteristic 2 UUID: 0xA2F2
-CONST uint8_t f91_notification_serviceChar2UUID[ATT_UUID_SIZE] =
+// Characteristic 2 UUID: 0xB2F2
+CONST uint8_t f91_clock_serviceChar2UUID[ATT_UUID_SIZE] =
 {
- F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR2_UUID)
+ F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR2_UUID)
 };
 
-// Characteristic 3 UUID: 0xA2F3
-CONST uint8_t f91_notification_serviceChar3UUID[ATT_UUID_SIZE] =
+// Characteristic 2 UUID: 0xB2F3
+CONST uint8_t f91_clock_serviceChar3UUID[ATT_UUID_SIZE] =
 {
- F91_BASE_UUID_128(F91_NOTIFICATION_SERVICE_CHAR3_UUID)
+ F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR3_UUID)
 };
 /*********************************************************************
  * LOCAL VARIABLES
  */
 
-static f91_notification_serviceCBs_t *pNotificationsAppCBs = NULL;
+static f91_clock_serviceCBs_t *pClocksAppCBs = NULL;
 
 /*********************************************************************
 * Profile Attributes - variables
 */
 
 // Service declaration
-static CONST gattAttrType_t f91NotificationServiceDecl = { ATT_UUID_SIZE, f91_notification_serviceUUID };
+static CONST gattAttrType_t f91ClockServiceDecl = { ATT_UUID_SIZE, f91_clock_serviceUUID };
 
-// F91 Notification Characteristic 1 Properties
-static uint8_t f91NotificationServiceChar1Props = GATT_PROP_READ | GATT_PROP_WRITE;
+// F91 Clock Characteristic 1 Properties
+static uint8_t f91ClockServiceChar1Props = GATT_PROP_READ | GATT_PROP_WRITE;
 
 // Characteristic 1 Value
-static uint8_t f91NotificationServiceChar1 = 0;
+static uint32_t f91ClockServiceChar1 = 0;
 
 // F91 Characteristic 1 User Description
-static uint8_t f91NotificationServiceUserDesp1[21] = "F91 Notification Bar";
+static uint8_t f91ClockServiceUserDesp1[9] = "F91 Time";
 
-// F91 Notification Characteristic 2 Properties
-static uint8_t f91NotificationServiceChar2Props = GATT_PROP_WRITE;
+// F91 Clock Characteristic 2 Properties
+static uint8_t f91ClockServiceChar2Props = GATT_PROP_READ | GATT_PROP_WRITE;
 
 // Characteristic 2 Value
-static uint8_t f91NotificationServiceChar2[CONTACT_STREAM_LEN] = {0};
-
-// Length of data in characteristic "Stream" Value variable, initialized to minimal size.
-static uint16_t f91NotificationServiceChar2Len = CONTACT_STREAM_LEN_MIN;
+static uint16_t f91ClockServiceChar2 = 0; //TO DO: Change this to be string instead and handle time zone names (PST, CST, MST...)
 
 // F91 Characteristic 2 User Description
-static uint8_t f91NotificationServiceUserDesp2[18] = "F91 Incoming Call";
+static uint8_t f91ClockServiceUserDesp2[14] = "F91 Time Zone";
 
-// F91 Notification Characteristic 3 Properties
-static uint8_t f91NotificationServiceChar3Props = GATT_PROP_WRITE;
+// F91 Clock Characteristic 3 Properties
+static uint8_t f91ClockServiceChar3Props = GATT_PROP_READ | GATT_PROP_WRITE;
 
 // Characteristic 3 Value
-static uint8_t f91NotificationServiceChar3[CONTACT_STREAM_LEN] = {0};
-
-// Length of data in characteristic "Stream" Value variable, initialized to minimal size.
-static uint16_t f91NotificationServiceChar3Len = CONTACT_STREAM_LEN_MIN;
+static uint8_t f91ClockServiceChar3 = 0;
 
 // F91 Characteristic 3 User Description
-static uint8_t f91NotificationServiceUserDesp3[18] = "F91 Incoming Text";
+static uint8_t f91ClockServiceUserDesp3[14] = "F91 Time Mode";
 
 
 
@@ -148,87 +142,90 @@ static uint8_t f91NotificationServiceUserDesp3[18] = "F91 Incoming Text";
 * Profile Attributes - Table
 */
 
-static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
+static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
 {
-  // f91_notification_service Service Declaration
+  // f91_clock_service Service Declaration
   {
     { ATT_BT_UUID_SIZE, primaryServiceUUID },
     GATT_PERMIT_READ,
     0,
-    (uint8_t *)&f91NotificationServiceDecl
+    (uint8_t *)&f91ClockServiceDecl
   },
+
   // Characteristic 1 Declaration
   {
     { ATT_BT_UUID_SIZE, characterUUID },
     GATT_PERMIT_READ,
     0,
-    &f91NotificationServiceChar1Props
+    &f91ClockServiceChar1Props
   },
       // Characteristic Value 1
       {
-        { ATT_UUID_SIZE, f91_notification_serviceChar1UUID },
+        { ATT_UUID_SIZE, f91_clock_serviceChar1UUID },
         GATT_PERMIT_READ | GATT_PERMIT_WRITE,
         0,
-        &f91NotificationServiceChar1
+         (uint8_t *)&f91ClockServiceChar1
       },
       // Characteristic 1 User Description
       {
         { ATT_BT_UUID_SIZE, charUserDescUUID },
         GATT_PERMIT_READ,
         0,
-        f91NotificationServiceUserDesp1
+        f91ClockServiceUserDesp1
       },
+  
     // Characteristic 2 Declaration
   {
     { ATT_BT_UUID_SIZE, characterUUID },
     GATT_PERMIT_READ,
     0,
-    &f91NotificationServiceChar2Props
+    &f91ClockServiceChar2Props
   },
       // Characteristic Value 2
       {
-        { ATT_UUID_SIZE, f91_notification_serviceChar2UUID },
-        GATT_PERMIT_WRITE,
+        { ATT_UUID_SIZE, f91_clock_serviceChar2UUID },
+        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
         0,
-        f91NotificationServiceChar2
+         (uint8_t *)&f91ClockServiceChar2
       },
       // Characteristic 2 User Description
       {
         { ATT_BT_UUID_SIZE, charUserDescUUID },
         GATT_PERMIT_READ,
         0,
-        f91NotificationServiceUserDesp2
+        f91ClockServiceUserDesp2
       },
-    // Characteristic 3 Declaration
+  
+      // Characteristic 3 Declaration
   {
     { ATT_BT_UUID_SIZE, characterUUID },
     GATT_PERMIT_READ,
     0,
-    &f91NotificationServiceChar3Props
+    &f91ClockServiceChar3Props
   },
       // Characteristic Value 3
       {
-        { ATT_UUID_SIZE, f91_notification_serviceChar3UUID },
-        GATT_PERMIT_WRITE,
+        { ATT_UUID_SIZE, f91_clock_serviceChar3UUID },
+        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
         0,
-        f91NotificationServiceChar3
+        &f91ClockServiceChar3
       },
-      // Characteristic 3 User Description
+      // Characteristic 2 User Description
       {
         { ATT_BT_UUID_SIZE, charUserDescUUID },
         GATT_PERMIT_READ,
         0,
-        f91NotificationServiceUserDesp3
+        f91ClockServiceUserDesp3
       },
 };
 
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
-static bStatus_t f91_notification_service_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
+static bStatus_t f91_clock_service_ReadAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
                                            uint8_t *pValue, uint16 *pLen, uint16 offset,
                                            uint16 maxLen, uint8_t method );
-static bStatus_t f91_notification_service_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
+static bStatus_t f91_clock_service_WriteAttrCB( uint16 connHandle, gattAttribute_t *pAttr,
                                             uint8_t *pValue, uint16 len, uint16 offset,
                                             uint8_t method );
 
@@ -236,10 +233,10 @@ static bStatus_t f91_notification_service_WriteAttrCB( uint16 connHandle, gattAt
  * PROFILE CALLBACKS
  */
 // Simple Profile Service Callbacks
-CONST gattServiceCBs_t f91_notification_serviceCBs =
+CONST gattServiceCBs_t f91_clock_serviceCBs =
 {
-  f91_notification_service_ReadAttrCB,  // Read callback function pointer
-  f91_notification_service_WriteAttrCB, // Write callback function pointer
+  f91_clock_service_ReadAttrCB,  // Read callback function pointer
+  f91_clock_service_WriteAttrCB, // Write callback function pointer
   NULL                       // Authorization callback function pointer
 };
 
@@ -248,33 +245,33 @@ CONST gattServiceCBs_t f91_notification_serviceCBs =
 */
 
 /*
- * F91_notification_service_AddService- Initializes the F91_notification_service service by registering
+ * F91_clock_service_AddService- Initializes the F91_clock_service service by registering
  *          GATT attributes with the GATT server.
  *
  */
-bStatus_t F91_notification_service_AddService(void)
+bStatus_t F91_clock_service_AddService(void)
 {
   uint8_t status;
   // Register GATT attribute list and CBs with GATT Server App
-  status = GATTServApp_RegisterService( f91_notification_serviceAttrTbl,
-                                        GATT_NUM_ATTRS( f91_notification_serviceAttrTbl ),
+  status = GATTServApp_RegisterService( f91_clock_serviceAttrTbl,
+                                        GATT_NUM_ATTRS( f91_clock_serviceAttrTbl ),
                                         GATT_MAX_ENCRYPT_KEY_SIZE,
-                                        &f91_notification_serviceCBs );
+                                        &f91_clock_serviceCBs );
 
   return ( status );
 }
 
 /*
- * F91_notification_service_RegisterAppCBs - Registers the application callback function.
+ * F91_clock_service_RegisterAppCBs - Registers the application callback function.
  *                    Only call this function once.
  *
  *    appCallbacks - pointer to application callbacks.
  */
-bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_serviceCBs_t *appCallbacks )
+bStatus_t F91_clock_service_RegisterAppCBs( f91_clock_serviceCBs_t *appCallbacks )
 {
   if ( appCallbacks )
   {
-    pNotificationsAppCBs = appCallbacks;
+    pClocksAppCBs = appCallbacks;
 
     return ( SUCCESS );
   }
@@ -285,7 +282,7 @@ bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_serviceCBs_t
 }
 
 /*
- * F91_notification_service_SetParameter - Set a F91_notification_service parameter.
+ * F91_clock_service_SetParameter - Set a F91_clock_service parameter.
  *
  *    param - Profile parameter ID
  *    len - length of data to right
@@ -294,46 +291,41 @@ bStatus_t F91_notification_service_RegisterAppCBs( f91_notification_serviceCBs_t
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t len, void *value )
+bStatus_t F91_clock_service_SetParameter( uint8_t param, uint16_t len, void *value )
 {
   bStatus_t ret = SUCCESS;
-  uint8_t  *pAttrVal;
-  uint16_t *pValLen;
-  uint16_t valMinLen;
-  uint16_t valMaxLen;
+
   switch ( param )
   {
-    case F91_NOTIFICATION_SERVICE_CHAR1:
-      if ( len == sizeof ( uint8_t ) )
+    case F91_CLOCK_SERVICE_CHAR1:
+      if ( len == sizeof ( uint32_t ) )
       {
-        f91NotificationServiceChar1 = *((uint8_t*)value);
+        f91ClockServiceChar1 = *((uint32_t*)value);
       }
       else
       {
         ret = bleInvalidRange;
       }
       break;
-    case F91_NOTIFICATION_SERVICE_CHAR2:
-      pAttrVal  =  f91NotificationServiceChar2;
-      pValLen   = &f91NotificationServiceChar2Len;
-      valMinLen =  CONTACT_STREAM_LEN_MIN;
-      valMaxLen =  CONTACT_STREAM_LEN;
-        if ( len <= valMaxLen && len >= valMinLen )
-        {
-          memcpy(pAttrVal, value, len);
-          *pValLen = len; // Update length for read and get.
-        }
+    case F91_CLOCK_SERVICE_CHAR2:
+      if ( len == sizeof ( uint16_t ) )
+      {
+        f91ClockServiceChar2 = *((uint16_t*)value);
+      }
+      else
+      {
+        ret = bleInvalidRange;
+      }
       break;
-    case F91_NOTIFICATION_SERVICE_CHAR3:
-      pAttrVal  =  f91NotificationServiceChar3;
-      pValLen   = &f91NotificationServiceChar3Len;
-      valMinLen =  CONTACT_STREAM_LEN_MIN;
-      valMaxLen =  CONTACT_STREAM_LEN;
-        if ( len <= valMaxLen && len >= valMinLen )
-        {
-          memcpy(pAttrVal, value, len);
-          *pValLen = len; // Update length for read and get.
-        }
+    case F91_CLOCK_SERVICE_CHAR3:
+      if ( len == sizeof ( uint8_t ) )
+      {
+        f91ClockServiceChar3 = *((uint8_t*)value);
+      }
+      else
+      {
+        ret = bleInvalidRange;
+      }
       break;
     default:
       ret = INVALIDPARAMETER;
@@ -344,7 +336,7 @@ bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t len, vo
 
 
 /*
- * F91_notification_service_GetParameter - Get a F91_notification_service parameter.
+ * F91_clock_service_GetParameter - Get a F91_clock_service parameter.
  *
  *    param - Profile parameter ID
  *    value - pointer to data to write.  This is dependent on
@@ -352,19 +344,19 @@ bStatus_t F91_notification_service_SetParameter( uint8_t param, uint16_t len, vo
  *          data type (example: data type of uint16 will be cast to
  *          uint16 pointer).
  */
-bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value )
+bStatus_t F91_clock_service_GetParameter( uint8_t param, void *value )
 {
   bStatus_t ret = SUCCESS;
   switch ( param )
   {
-    case F91_NOTIFICATION_SERVICE_CHAR1:
-        *((uint8_t*)value) = f91NotificationServiceChar1;
+    case F91_CLOCK_SERVICE_CHAR1:
+        *((uint32_t*)value) = f91ClockServiceChar1;
       break;
-    case F91_NOTIFICATION_SERVICE_CHAR2:
-        memcpy(value, f91NotificationServiceChar2, f91NotificationServiceChar2Len);
+    case F91_CLOCK_SERVICE_CHAR2:
+        *((uint16_t*)value) = f91ClockServiceChar2;
       break;
-    case F91_NOTIFICATION_SERVICE_CHAR3:
-        memcpy(value, f91NotificationServiceChar3, f91NotificationServiceChar3Len);
+    case F91_CLOCK_SERVICE_CHAR3:
+        *((uint8_t*)value) = f91ClockServiceChar3;
       break;
     default:
       ret = INVALIDPARAMETER;
@@ -374,7 +366,7 @@ bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value )
 }
 
 /*********************************************************************
- * @fn          f91_notification_service_ReadAttrCB
+ * @fn          f91_clock_service_ReadAttrCB
  *
  * @brief       Read an attribute.
  *
@@ -388,12 +380,11 @@ bStatus_t F91_notification_service_GetParameter( uint8_t param, void *value )
  *
  * @return      SUCCESS, blePending or Failure
  */
-static bStatus_t f91_notification_service_ReadAttrCB( uint16_t connHandle, gattAttribute_t *pAttr,
+static bStatus_t f91_clock_service_ReadAttrCB( uint16_t connHandle, gattAttribute_t *pAttr,
                                        uint8_t *pValue, uint16_t *pLen, uint16_t offset,
                                        uint16_t maxLen, uint8_t method )
 {
   bStatus_t status = SUCCESS;
-  uint16_t valueLen;
 
   // Make sure it's not a blob operation (no attributes in the profile are long)
   if ( offset > 0 )
@@ -403,18 +394,17 @@ static bStatus_t f91_notification_service_ReadAttrCB( uint16_t connHandle, gattA
 
   if ( pAttr->type.len == ATT_UUID_SIZE ) {
         // 128-bit UUID
-    if (!memcmp(pAttr->type.uuid, f91_notification_serviceChar1UUID, ATT_UUID_SIZE)) {
+    if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar1UUID, ATT_UUID_SIZE)) {
+      *pLen = sizeof(uint32_t);
+      memcpy(pValue, pAttr->pValue + offset, *pLen);
+      
+    } else if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar2UUID, ATT_UUID_SIZE)) {
+      *pLen = sizeof(uint16_t);
+      memcpy(pValue, pAttr->pValue + offset, *pLen);
+    } else if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar3UUID, ATT_UUID_SIZE)) {
       *pLen = 1;
       pValue[0] = *pAttr->pValue;
-    } else if (!memcmp(pAttr->type.uuid, f91_notification_serviceChar2UUID, ATT_UUID_SIZE)) {
-      valueLen = f91NotificationServiceChar2Len;
-      *pLen = MIN(maxLen, valueLen - offset);  // Transmit as much as possible
-      memcpy(pValue, pAttr->pValue + offset, *pLen);
-    } else if (!memcmp(pAttr->type.uuid, f91_notification_serviceChar3UUID, ATT_UUID_SIZE)) {
-      valueLen = f91NotificationServiceChar3Len;
-      *pLen = MIN(maxLen, valueLen - offset);  // Transmit as much as possible
-      memcpy(pValue, pAttr->pValue + offset, *pLen);
-    }
+    } 
   }
 
 
@@ -423,7 +413,7 @@ static bStatus_t f91_notification_service_ReadAttrCB( uint16_t connHandle, gattA
 
 
 /*********************************************************************
- * @fn      f91_notification_service_WriteAttrCB
+ * @fn      f91_clock_service_WriteAttrCB
  *
  * @brief   Validate attribute data prior to a write operation
  *
@@ -436,46 +426,29 @@ static bStatus_t f91_notification_service_ReadAttrCB( uint16_t connHandle, gattA
  *
  * @return  SUCCESS, blePending or Failure
  */
-static bStatus_t f91_notification_service_WriteAttrCB( uint16_t connHandle, gattAttribute_t *pAttr,
+static bStatus_t f91_clock_service_WriteAttrCB( uint16_t connHandle, gattAttribute_t *pAttr,
                                         uint8_t *pValue, uint16_t len, uint16_t offset,
                                         uint8_t method )
 {
   bStatus_t status = SUCCESS;
   uint8_t notifyApp = 0xFF;
-  uint16_t writeLenMin = CONTACT_STREAM_LEN_MIN;
-  uint16_t writeLenMax = CONTACT_STREAM_LEN;
   if ( pAttr->type.len == ATT_UUID_SIZE ) {
       // 128-bit UUID
-      if (!memcmp(pAttr->type.uuid, f91_notification_serviceChar1UUID, ATT_UUID_SIZE)) {
+      if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar1UUID, ATT_UUID_SIZE)) {
+          memcpy(pAttr->pValue + offset, pValue, len);
+          notifyApp = F91_CLOCK_SERVICE_CHAR1;
+      } else if(!memcmp(pAttr->type.uuid, f91_clock_serviceChar2UUID, ATT_UUID_SIZE)) {
+          memcpy(pAttr->pValue + offset, pValue, len);
+          notifyApp = F91_CLOCK_SERVICE_CHAR2;
+      } else if(!memcmp(pAttr->type.uuid, f91_clock_serviceChar3UUID, ATT_UUID_SIZE)) {
           uint8_t *pCurValue = (uint8_t *)pAttr->pValue;
           *pCurValue = pValue[0];
-          if( pAttr->pValue == &f91NotificationServiceChar1 ) {
-            notifyApp = F91_NOTIFICATION_SERVICE_CHAR1;
+          if( pAttr->pValue == &f91ClockServiceChar3 ) {
+            notifyApp = F91_CLOCK_SERVICE_CHAR3;
           }
-      } else if(!memcmp(pAttr->type.uuid, f91_notification_serviceChar2UUID, ATT_UUID_SIZE)) {
-        if(len <= writeLenMax) {
-          memcpy(pAttr->pValue + offset, pValue, len);
-          if ( offset + len >= writeLenMin ) {
-            notifyApp = F91_NOTIFICATION_SERVICE_CHAR2;
-            f91NotificationServiceChar2Len = offset + len; // Update data length.
-          }
-        } else {
-          status = ATT_ERR_INVALID_VALUE_SIZE;
-        }
-      } else if(!memcmp(pAttr->type.uuid, f91_notification_serviceChar3UUID, ATT_UUID_SIZE)) {
-        if(len <= writeLenMax) {
-          memcpy(pAttr->pValue + offset, pValue, len);
-          if ( offset + len >= writeLenMin ) {
-            notifyApp = F91_NOTIFICATION_SERVICE_CHAR3;
-            f91NotificationServiceChar3Len = offset + len; // Update data length.
-          }
-        } else {
-          status = ATT_ERR_INVALID_VALUE_SIZE;
-        }
       } else {
           status = ATT_ERR_INVALID_HANDLE;
       }
-
   } else {
     // 128-bit UUID
     status = ATT_ERR_INVALID_HANDLE;
@@ -483,8 +456,8 @@ static bStatus_t f91_notification_service_WriteAttrCB( uint16_t connHandle, gatt
 
 
   // If a characteristic value changed then callback function to notify application of change
-  if ( (notifyApp != 0xFF ) && pNotificationsAppCBs && pNotificationsAppCBs->pfnNotificationChangeCb ) {
-    pNotificationsAppCBs->pfnNotificationChangeCb( notifyApp );
+  if ( (notifyApp != 0xFF ) && pClocksAppCBs && pClocksAppCBs->pfnClockChangeCb ) {
+    pClocksAppCBs->pfnClockChangeCb( notifyApp );
   }
 
   return status;

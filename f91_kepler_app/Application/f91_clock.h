@@ -36,6 +36,8 @@ extern "C"
 /*********************************************************************
  * INCLUDES
  */
+#include "board.h"
+#include "f91_kepler.h"
 
 /*********************************************************************
 *  EXTERNAL VARIABLES
@@ -44,6 +46,15 @@ extern "C"
 /*********************************************************************
  * CONSTANTS
  */
+
+//Time zones, currently only United States.
+#define DEFAULT_TIME    758505600
+#define TZ_HST          36000
+#define TZ_AKST         32400
+#define TZ_PST          28800
+#define TZ_MST          25200
+#define TZ_CST          21600
+#define TZ_EST          18000
 
 /*********************************************************************
  * MACROS
@@ -57,6 +68,22 @@ extern "C"
  * Task creation function for F91 Kepler Smart Watch.
  */
 extern void F91Clock_createTask(void);
+
+/*
+ * Initialize clock module
+ */
+extern void F91Clock_init(void);
+
+/*
+ * Task Event Processor for characteristic changes
+ */
+void F91Clock_processCharChangeEvt(uint8_t paramID);
+
+/*
+ * Task Event Processor for clock module
+ */
+extern void F91Clock_processEvent(void);
+
 
 /*********************************************************************
 *********************************************************************/
