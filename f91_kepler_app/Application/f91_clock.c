@@ -107,9 +107,6 @@ static ICall_SyncHandle syncEvent;
 static uint16_t TimeZone;
 
 // For clock
-static int lastWrittenHr = 999;
-static int lastWrittenMin = 999;
-static int lastWrittenSec = 999;
 static bool TimeMode = true;
 
 
@@ -294,7 +291,7 @@ static void F91Clock_doTime(void) {
 
     dateString = strcat(strcat(month,"/"),day);
     ssd1306_display_semicolon(34, 13, false);
-    ssd1306_display_text("00000", 64, 1, true); // erase all date field first
+    ssd1306_display_text("000000", 59, 1, true); // erase all date field first
     ssd1306_display_text(dateString, 95 - (strlen(dateString)*6), 1, false); // display date, right aligned
 
     if(ltm->tm_hour<10){
@@ -308,29 +305,22 @@ static void F91Clock_doTime(void) {
         minute[1]=minute[0];
         minute[0]='0';
     }
+
     if(ltm->tm_sec<10){
         second[1]=second[0];
         second[0]='0';
     }
+    //Hour
+    ssd1306_display_number(hour[0]-'0', 0, 13, eraseFirstDigit);
+    ssd1306_display_number(hour[1]-'0', 17, 13, false);
+    //Minutes
+    ssd1306_display_number(minute[0]-'0', 39, 13, false);
+    ssd1306_display_number(minute[1]-'0', 56, 13, false);
+    //Seconds
+    ssd1306_display_small_number(second[0]-'0', 74, 25, false);
+    ssd1306_display_small_number(second[1]-'0', 84, 25, false);
 
-    if(lastWrittenHr != ltm->tm_hour) {
-        ssd1306_display_number(hour[0]-'0', 0, 13, eraseFirstDigit);
-        ssd1306_display_number(hour[1]-'0', 17, 13, false);
-        lastWrittenHr = ltm->tm_hour;
-    }
-
-    if(lastWrittenMin != ltm->tm_min) {
-        ssd1306_display_number(minute[0]-'0', 39, 13, false);
-        ssd1306_display_number(minute[1]-'0', 56, 13, false);
-        lastWrittenMin = ltm->tm_min;
-    }
-
-    if(lastWrittenSec != ltm->tm_sec){
-        ssd1306_display_small_number(second[0]-'0', 74, 25, false);
-        ssd1306_display_small_number(second[1]-'0', 84, 25, false);
-        lastWrittenSec = ltm->tm_sec;
-        ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
-    }
+    ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
 }
 
 /*********************************************************************
