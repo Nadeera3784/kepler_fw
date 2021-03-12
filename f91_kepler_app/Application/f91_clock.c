@@ -134,7 +134,6 @@ static bool F91Clock_getTimeMode( void );
 static void F91Clock_setTime(uint32_t time)
 {
     Seconds_set(time);
-    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR1, sizeof(uint32_t), &time);
 }
 
 /*********************************************************************
@@ -265,22 +264,24 @@ static void F91Clock_doTime(void) {
     char second[2];
     char month[2];
     char day[2];
+    uint32_t timeInSeconds = 0;
     
     t1 = time(NULL);
     t1 = t1 - F91Clock_getTimeZone();
     ltm = localtime(&t1);
+    timeInSeconds = Seconds_get();
     eraseFirstDigit = false;
 
     if((!F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
         ltm->tm_hour = ltm->tm_hour - 12;
-        ssd1306_display_pm(74, 13, false);
+        ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
     } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
         ltm->tm_hour = 12;
-        ssd1306_display_pm(74, 13, true);
+        ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
     } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
-        ssd1306_display_pm(74, 13, false);
+        ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
     } else {
-        ssd1306_display_pm(74, 13, true);
+        ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
     }
 
     ltoa(ltm->tm_hour, hour);
@@ -290,8 +291,8 @@ static void F91Clock_doTime(void) {
     ltoa(ltm->tm_mday, day);
 
     dateString = strcat(strcat(month,"/"),day);
-    ssd1306_display_semicolon(34, 13, false);
-    ssd1306_display_text("000000", 59, 1, true); // erase all date field first
+    ssd1306_display_semicolon(SEM_CLN_POS_X, SEM_CLN_POS_Y, false);
+    ssd1306_display_text("000000", DATE_POS_X, DATE_POS_Y, true); // erase all date field first
     ssd1306_display_text(dateString, 95 - (strlen(dateString)*6), 1, false); // display date, right aligned
 
     if(ltm->tm_hour<10){
@@ -311,16 +312,20 @@ static void F91Clock_doTime(void) {
         second[0]='0';
     }
     //Hour
-    ssd1306_display_number(hour[0]-'0', 0, 13, eraseFirstDigit);
-    ssd1306_display_number(hour[1]-'0', 17, 13, false);
+    ssd1306_display_number(hour[0]-'0', HR_1_POS_X, HR_MIN_POS_Y, eraseFirstDigit);
+    ssd1306_display_number(hour[1]-'0', HR_2_POS_X, HR_MIN_POS_Y, false);
     //Minutes
-    ssd1306_display_number(minute[0]-'0', 39, 13, false);
-    ssd1306_display_number(minute[1]-'0', 56, 13, false);
+    ssd1306_display_number(minute[0]-'0', MIN_1_POS_X, HR_MIN_POS_Y, false);
+    ssd1306_display_number(minute[1]-'0', MIN_2_POS_X, HR_MIN_POS_Y, false);
     //Seconds
-    ssd1306_display_small_number(second[0]-'0', 74, 25, false);
-    ssd1306_display_small_number(second[1]-'0', 84, 25, false);
+    ssd1306_display_small_number(second[0]-'0', SEC_1_POS_X, SEC_POS_Y, false);
+    ssd1306_display_small_number(second[1]-'0', SEC_2_POS_X, SEC_POS_Y, false);
 
-    ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    //Update Display
+    ssd1306_update();
+
+    //Update service
+    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR1, sizeof(uint32_t), &timeInSeconds);
 }
 
 /*********************************************************************

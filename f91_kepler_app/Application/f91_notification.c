@@ -225,31 +225,31 @@ void F91Notificaton_Update(uint8_t type)
 {
   if (type == NOTIFICATION_BAR) {
     if (current_notifications.email) {
-      ssd1306_display_notification(EMAIL, 0, 0, false);
+      ssd1306_display_notification(EMAIL, EMAIL_POS_X, NOTIFICATIONS_POS_Y, false);
     } else {
-      ssd1306_display_notification(EMAIL, 0, 0, true);
+      ssd1306_display_notification(EMAIL, EMAIL_POS_X, NOTIFICATIONS_POS_Y, true);
     }
     if (current_notifications.text) {
-      ssd1306_display_notification(TEXT, 14, 0, false);
+      ssd1306_display_notification(TEXT, TEXT_POS_X, NOTIFICATIONS_POS_Y, false);
     } else {
-      ssd1306_display_notification(TEXT, 14, 0, true);
+      ssd1306_display_notification(TEXT, TEXT_POS_X, NOTIFICATIONS_POS_Y, true);
     }
     if (current_notifications.voicemail) {
-      ssd1306_display_notification(VOICEMAIL, 29, 0, false);
+      ssd1306_display_notification(VOICEMAIL, VOIEMAIL_POS_X, NOTIFICATIONS_POS_Y, false);
     } else {
-      ssd1306_display_notification(VOICEMAIL, 29, 0, true);
+      ssd1306_display_notification(VOICEMAIL, VOIEMAIL_POS_X, NOTIFICATIONS_POS_Y, true);
     }
     if (current_notifications.missedcall) {
-      ssd1306_display_notification(MISSEDCALL, 44, 0, false);
+      ssd1306_display_notification(MISSEDCALL, MISSEDCALL_POS_X, NOTIFICATIONS_POS_Y, false);
     } else {
-      ssd1306_display_notification(MISSEDCALL, 44, 0, true);
+      ssd1306_display_notification(MISSEDCALL, MISSEDCALL_POS_X, NOTIFICATIONS_POS_Y, true);
     }
   } 
   else if (type == NOTIFICATION_CALL) {
-    ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    ssd1306_clear();
     ssd1306_display_full_notification(INCOMING_CALL, current_notifications.incoming_call);
   } else if (type == NOTIFICATION_TEXT) {
-    ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    ssd1306_clear();
     ssd1306_display_full_notification(INCOMING_TEXT, current_notifications.incoming_text);
   }
 }
