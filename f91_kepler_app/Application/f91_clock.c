@@ -109,7 +109,6 @@ static uint16_t TimeZone;
 // For clock
 static bool TimeMode = true;
 
-
 /*********************************************************************
  * LOCAL FUNCTIONS
  */

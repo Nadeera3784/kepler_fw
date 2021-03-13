@@ -121,6 +121,8 @@ bleUserCfg_t user0Cfg = BLE_USER_CFG;
  * GLOBAL VARIABLES
  */
 Display_Handle F91_LOGGER = NULL;
+Semaphore_Struct semStruct;
+Semaphore_Handle semHandle;
 
 #ifdef CC1350_LAUNCHXL
 #ifdef POWER_SAVING
@@ -215,6 +217,15 @@ int main()
   user0Cfg.appServiceInfo->timerTickPeriod = Clock_tickPeriod;
   user0Cfg.appServiceInfo->timerMaxMillisecond  = ICall_getMaxMSecs();
 #endif  /* ICALL_JT */
+  
+  /* Construct a Semaphore object to be use as a resource lock, inital count 1 */
+  Semaphore_Params semParams;
+  Semaphore_Params_init(&semParams);
+  Semaphore_construct(&semStruct, 1, &semParams);
+
+    /* Obtain instance handle */
+  semHandle = Semaphore_handle(&semStruct);
+  
   /* Initialize ICall module */
   ICall_init();
 

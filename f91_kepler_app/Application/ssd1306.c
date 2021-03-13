@@ -29,6 +29,7 @@
 #include <ti/display/Display.h>
 #include <ti/drivers/GPIO.h>
 #include <ti/drivers/I2C.h>
+#include <ti/sysbios/BIOS.h>
 
 #include "Board.h"
 
@@ -114,10 +115,8 @@ void ssd1306_set_position(uint8_t, uint8_t);
  *
  */
 void ssd1306_command(uint8_t command) {
-
     command_buffer[0] = 0x80;
     command_buffer[1] = command;
-
     ssd1306_send_buffer(command_buffer, sizeof(command_buffer));
 }
 
@@ -135,7 +134,6 @@ void ssd1306_command(uint8_t command) {
 void ssd1306_clear_buffer(uint8_t *buffer, int size) {
     ssd1306_set_position(0, 0);
     memset(ssd1306_display_buffer, 0, sizeof(ssd1306_display_buffer)); //Reset buffer
-
     ssd1306_display_buffer[0]=0x40;
     ssd1306_set_position(0,0);
 }
@@ -327,7 +325,9 @@ void ssd1306_init(void) {//Init Sequence
  *
  */
 void ssd1306_update( void ) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
     ssd1306_send_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -340,7 +340,9 @@ void ssd1306_update( void ) {
  *
  */
 void ssd1306_clear( void ) {
-   ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));;
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+    ssd1306_clear_buffer(ssd1306_display_buffer, sizeof(ssd1306_display_buffer));;
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -357,6 +359,8 @@ void ssd1306_clear( void ) {
  *
  */
 void ssd1306_display_text(char *text, uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     while (*text != '\0') {
         uint8_t b_x, b_y, dataByte;
@@ -374,6 +378,8 @@ void ssd1306_display_text(char *text, uint8_t x, uint8_t y, bool erase) {
         text++;
         x+=6;
     }
+
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -390,6 +396,8 @@ void ssd1306_display_text(char *text, uint8_t x, uint8_t y, bool erase) {
  *
  */
 void ssd1306_display_number(uint8_t number, uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t page, b_x, b_y, dataByte;
     for (page = 0; page<4; page++) {
@@ -405,6 +413,7 @@ void ssd1306_display_number(uint8_t number, uint8_t x, uint8_t y, bool erase) {
             }
         }
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -421,6 +430,8 @@ void ssd1306_display_number(uint8_t number, uint8_t x, uint8_t y, bool erase) {
  *
  */
 void ssd1306_display_small_number(uint8_t number, uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t page, b_x, b_y, dataByte;
     for (page = 0; page<2; page++) {
@@ -436,6 +447,7 @@ void ssd1306_display_small_number(uint8_t number, uint8_t x, uint8_t y, bool era
             }
         }
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -451,6 +463,8 @@ void ssd1306_display_small_number(uint8_t number, uint8_t x, uint8_t y, bool era
  *
  */
 void ssd1306_display_semicolon(uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t page, b_x, b_y, dataByte;
     for (page = 0; page<4; page++) {
@@ -466,6 +480,7 @@ void ssd1306_display_semicolon(uint8_t x, uint8_t y, bool erase) {
             }
         }
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -481,6 +496,8 @@ void ssd1306_display_semicolon(uint8_t x, uint8_t y, bool erase) {
  *
  */
 void ssd1306_display_pm(uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t b_x, b_y, dataByte;
     for(b_x = 0; b_x<=11; b_x++) {
@@ -494,6 +511,7 @@ void ssd1306_display_pm(uint8_t x, uint8_t y, bool erase) {
             dataByte<<=1; // Shift.
         }
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -510,6 +528,8 @@ void ssd1306_display_pm(uint8_t x, uint8_t y, bool erase) {
  *
  */
 void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t page, b_x, b_y, dataByte;
     for (page = 0; page<2; page++) {
@@ -525,6 +545,7 @@ void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase
             }
         }
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
@@ -539,6 +560,8 @@ void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase
  *
  */
 void ssd1306_display_full_notification(uint8_t type, char *text) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
     ssd1306_set_position(0, 0);
     uint8_t page, b_x, b_y, dataByte;
     for (page = 0; page<5; page++) {
@@ -565,6 +588,8 @@ void ssd1306_display_full_notification(uint8_t type, char *text) {
     double centerPadding = 12 - strlen(text);
     centerPadding = ((centerPadding/2)*6)+25;
     int space = (int)centerPadding;
+    Semaphore_post(semHandle);
+
     ssd1306_display_text(text, space, 21, false);
 }
 
@@ -579,6 +604,7 @@ void ssd1306_display_full_notification(uint8_t type, char *text) {
  *
  */
 void ssd1306_toggle_display ( bool state ) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
     if (state) {
         ssd1306_command(SET_DISP_ON);
         displayState = 1;
@@ -586,6 +612,7 @@ void ssd1306_toggle_display ( bool state ) {
         ssd1306_command(SET_DISP_OFF);
         displayState = 0;
     }
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************
