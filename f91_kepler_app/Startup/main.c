@@ -61,6 +61,7 @@
 
 #include <ti/sysbios/BIOS.h>
 #include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Mailbox.h>
 #include <ti/display/Display.h>
 
 #include "Board.h"
@@ -123,6 +124,12 @@ bleUserCfg_t user0Cfg = BLE_USER_CFG;
 Display_Handle F91_LOGGER = NULL;
 Semaphore_Struct semStruct;
 Semaphore_Handle semHandle;
+
+/* This buffer is not directly accessed by the application */
+MailboxMsgObj mailboxBuffer[NUMMSGS];
+
+Mailbox_Struct mbxStruct;
+Mailbox_Handle mbxHandle;
 
 #ifdef CC1350_LAUNCHXL
 #ifdef POWER_SAVING
@@ -218,6 +225,14 @@ int main()
   user0Cfg.appServiceInfo->timerMaxMillisecond  = ICall_getMaxMSecs();
 #endif  /* ICALL_JT */
   
+  //Contrust a mailbox object to be used to communicate across tasks.
+  Mailbox_Params mbxParams;
+  Mailbox_Params_init(&mbxParams);
+  mbxParams.buf = (Ptr)mailboxBuffer;
+  mbxParams.bufSize = sizeof(mailboxBuffer);
+  Mailbox_construct(&mbxStruct, sizeof(MsgObj), NUMMSGS, &mbxParams, NULL);
+  mbxHandle = Mailbox_handle(&mbxStruct);
+
   /* Construct a Semaphore object to be use as a resource lock, inital count 1 */
   Semaphore_Params semParams;
   Semaphore_Params_init(&semParams);

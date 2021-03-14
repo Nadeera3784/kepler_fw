@@ -36,7 +36,7 @@
 #include <ti/sysbios/knl/Event.h>
 #include <ti/sysbios/knl/Queue.h>
 #include <ti/sysbios/knl/Semaphore.h>
-#include <ti/sysbios/gates/GateMutex.h>
+#include <ti/sysbios/knl/Mailbox.h>
 #include <ti/sysbios/BIOS.h>
 #include <ti/display/Display.h>
 #include <time.h>
@@ -115,16 +115,17 @@ static bool Dst = false;
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
-static void F91Clock_internal_init( void );
-static void F91Clock_taskFxn(UArg a0, UArg a1);
-static void F91Clock_doTime(void);
-static void F91Clock_setTime(uint32_t time);
-static void F91Clock_setTimeZone(uint16_t zone);
-static void F91Clock_setTimeMode(uint8_t mode);
-static void F91Clock_setDst(uint8_t mode);
-static uint16_t F91Clock_getTimeZone( void );
-static bool F91Clock_getTimeMode( void );
-static bool F91Clock_getDst( void );
+static void _F91Clock_internal_init( void );
+static void _F91Clock_taskFxn(UArg a0, UArg a1);
+static void _F91Clock_doTime(void);
+static void _F91Clock_setTime(uint32_t time);
+static void _F91Clock_setTimeZone(uint16_t zone);
+static void _F91Clock_setTimeMode(uint8_t mode);
+static void _F91Clock_setDst(uint8_t mode);
+static uint16_t _F91Clock_getTimeZone( void );
+static bool _F91Clock_getTimeMode( void );
+static bool _F91Clock_getDst( void );
+static void _F91Clock_checkInbox( void );
 
 
 /*********************************************************************
@@ -135,7 +136,7 @@ static bool F91Clock_getDst( void );
  * @param   time - self explanatory.
  *
  */
-static void F91Clock_setTime(uint32_t time)
+static void _F91Clock_setTime(uint32_t time)
 {
     Seconds_set(time);
 }
@@ -148,7 +149,7 @@ static void F91Clock_setTime(uint32_t time)
  * @param   timezone - self explanatory.
  *
  */
-static void F91Clock_setTimeZone(uint16_t zone)
+static void _F91Clock_setTimeZone(uint16_t zone)
 {
     TimeZone = zone;
     F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR2, sizeof(uint16_t), &TimeZone);
@@ -162,7 +163,7 @@ static void F91Clock_setTimeZone(uint16_t zone)
  * @param   mode - (0: 12hr  1: 24hr).
  *
  */
-static void F91Clock_setTimeMode(uint8_t mode)
+static void _F91Clock_setTimeMode(uint8_t mode)
 {
     switch ( mode )
     {
@@ -189,7 +190,7 @@ static void F91Clock_setTimeMode(uint8_t mode)
  * @param   mode - (0: 12hr  1: 24hr).
  *
  */
-static void F91Clock_setDst(uint8_t mode)
+static void _F91Clock_setDst(uint8_t mode)
 {
     switch ( mode )
     {
@@ -216,9 +217,22 @@ static void F91Clock_setDst(uint8_t mode)
  * @param   none
  *
  */
-static uint16_t F91Clock_getTimeZone( void )
+static uint16_t _F91Clock_getTimeZone( void )
 {
     return TimeZone;
+}
+
+/*********************************************************************
+ * @fn      F91Clock_getTimeMode
+ *
+ * @brief   Returns the mode to display clock (24 or 12 hr)
+ *
+ * @param   none
+ *
+ */
+static bool _F91Clock_getTimeMode( void )
+{
+    return TimeMode;
 }
 
 /*********************************************************************
@@ -229,23 +243,44 @@ static uint16_t F91Clock_getTimeZone( void )
  * @param   none
  *
  */
-static bool F91Clock_getDst( void )
+static bool _F91Clock_getDst( void )
 {
     return Dst;
 }
 
-
 /*********************************************************************
- * @fn      F91Clock_getTimeMode
+ * @fn      F91Clock_checkInbox
  *
- * @brief   Returns the mode to display clock (24 or 12 hr)
+ * @brief   Checks if there has been any messages sent to this task (clock) to update its parameters.
+ *          Using a mailbox since there are two tasks at play here. (f91_clock and f91_kepler).
  *
  * @param   none
  *
  */
-static bool F91Clock_getTimeMode( void )
+static void _F91Clock_checkInbox( void )
 {
-    return TimeMode;
+    MsgObj msg;
+    Int i;
+    for (i = 0; i < Mailbox_getNumPendingMsgs(mbxHandle); i++) {
+        Mailbox_pend(mbxHandle, &msg, BIOS_NO_WAIT);
+        switch (msg.id) 
+        {
+            case F91_CLOCK_SERVICE_CHAR1:
+                _F91Clock_setTime(*((uint32_t*)msg.value));
+                break;
+            case F91_CLOCK_SERVICE_CHAR2:
+                _F91Clock_setTimeZone(*((uint16_t*)msg.value));
+                break;
+            case F91_CLOCK_SERVICE_CHAR3:
+                _F91Clock_setTimeMode(*((uint8_t*)msg.value));
+                break;
+            case F91_CLOCK_SERVICE_CHAR4:
+                _F91Clock_setDst(*((uint8_t*)msg.value));
+                break;
+            default:
+                break;
+        }
+    }
 }
 
  /*********************************************************************
@@ -267,7 +302,7 @@ void F91Clock_createTask(void)
     taskParams.stackSize = F91_CLOCK_TASK_STACK_SIZE;
     taskParams.priority = F91_CLOCK_TASK_PRIORITY;
 
-    Task_construct(&f91ClockTask, F91Clock_taskFxn, &taskParams, NULL);
+    Task_construct(&f91ClockTask, _F91Clock_taskFxn, &taskParams, NULL);
 }
 
 /*********************************************************************
@@ -282,7 +317,7 @@ void F91Clock_createTask(void)
  *
  * @return  None.
  */
-static void F91Clock_internal_init(void)
+static void _F91Clock_internal_init(void)
 {  
     // Register the current thread as an ICall dispatcher application
     // so that the application can send and receive messages.
@@ -292,14 +327,14 @@ static void F91Clock_internal_init(void)
     ssd1306_init();
 
     //**************set default time & zone (00:00:00 01/14/1994)(UTC) & PST************
-    F91Clock_setTime(DEFAULT_TIME);
-    F91Clock_setTimeZone(TZ_PST);
-    F91Clock_setTimeMode(0);
-    F91Clock_setDst(0);
+    _F91Clock_setTime(DEFAULT_TIME);
+    _F91Clock_setTimeZone(TZ_PST);
+    _F91Clock_setTimeMode(0);
+    _F91Clock_setDst(0);
     //***********************************************************
 }
 
-static void F91Clock_doTime(void) {
+static void _F91Clock_doTime(void) {
     time_t t1;
     struct tm *ltm;
     bool eraseFirstDigit;
@@ -312,10 +347,10 @@ static void F91Clock_doTime(void) {
     uint32_t timeInSeconds = 0;
     
     t1 = time(NULL);
-    t1 = t1 - F91Clock_getTimeZone();
+    t1 = t1 - _F91Clock_getTimeZone();
 
     //Handle daylight savings
-    if(F91Clock_getDst()){
+    if(_F91Clock_getDst()){
         t1 += 3600;
     }
 
@@ -324,13 +359,13 @@ static void F91Clock_doTime(void) {
     eraseFirstDigit = false;
 
     //Handle 24hr or 12 hr time.
-    if((!F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
+    if((!_F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
         ltm->tm_hour = ltm->tm_hour - 12;
         ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
-    } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
+    } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
         ltm->tm_hour = 12;
         ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
-    } else if((!F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
+    } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
         ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
     } else {
         ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
@@ -411,14 +446,20 @@ static f91_clock_serviceCBs_t F91Clock_StateChangeCB =
  *
  * @return  None.
  */
-static void F91Clock_taskFxn(UArg a0, UArg a1)
+static void _F91Clock_taskFxn(UArg a0, UArg a1)
 {
     // Initialize application
-    F91Clock_internal_init();
+    _F91Clock_internal_init();
     // Application main loop
     for (;;)
     {   
-        F91Clock_doTime();
+        //Update the time.
+        _F91Clock_doTime();
+
+        //Check if there is any messages to update time parameters.
+        _F91Clock_checkInbox();
+
+        //Let the task sleep for a second so other tasks can do there duties.
         Task_sleep(1000 * (1000 / Clock_tickPeriod));
     }
 }
@@ -453,22 +494,33 @@ void F91Clock_processCharChangeEvt(uint8_t paramID)
   uint32_t time;
   uint16_t zone;
   uint8_t  mode;
+  MsgObj msg;
+  
   switch (paramID)
   {
     case F91_CLOCK_SERVICE_CHAR1:
-      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR1, &time);
-      F91Clock_setTime(time);
+        F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR1, &time);
+        msg.id = F91_CLOCK_SERVICE_CHAR1;
+        msg.value = &time;
+        Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT);
       break;
     case F91_CLOCK_SERVICE_CHAR2:
-      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR2, &zone);
-      F91Clock_setTimeZone(zone);
+        F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR2, &zone);
+        msg.id = F91_CLOCK_SERVICE_CHAR2;
+        msg.value = &zone;
+        Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT);
       break;
     case F91_CLOCK_SERVICE_CHAR3:
-      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR3, &mode);
-      F91Clock_setTimeMode(mode);
+        F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR3, &mode);
+        msg.id = F91_CLOCK_SERVICE_CHAR3;
+        msg.value = &mode;
+        Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT);
+      break;
     case F91_CLOCK_SERVICE_CHAR4:
-      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR4, &mode);
-      F91Clock_setDst(mode);
+        F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR4, &mode);
+        msg.id = F91_CLOCK_SERVICE_CHAR4;
+        msg.value = &mode;
+        Mailbox_post(mbxHandle, &msg, BIOS_NO_WAIT);
       break;
     default:
       break;
