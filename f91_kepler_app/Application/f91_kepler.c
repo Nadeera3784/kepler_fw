@@ -54,7 +54,6 @@
 #include <ti/sysbios/knl/Queue.h>
 #include <ti/display/Display.h>
 #include <ti/sysbios/BIOS.h>
-#include <ti/drivers/PIN.h>
 
 #if defined( USE_FPGA ) || defined( DEBUG_SW_TRACE )
 #include <driverlib/ioc.h>
@@ -85,6 +84,7 @@
 #include "f91_notification_service.h"
 #include "f91_clock.h"
 #include "f91_clock_service.h"
+#include "f91_buttons.h"
 #include "f91_utils.h"
 #include "ssd1306.h"
 
@@ -174,13 +174,6 @@ typedef struct
   uint8_t *pData;  // event data
 } f91Evt_t;
 
-
-typedef struct
-{
-  PIN_Id   pinId;
-  uint8_t  state;
-} button_state_t;
-
 /*********************************************************************
  * GLOBAL VARIABLES
  */
@@ -259,27 +252,6 @@ static uint8_t advertData[] =
 // GAP GATT Attributes
 static uint8_t attDeviceName[GAP_DEVICE_NAME_LEN_KEPLER] = "F91 Kepler";
 
-/* Pin driver handles */
-static PIN_Handle buttonPinHandle;
-static PIN_State buttonPinState;
-
-/*
- * Application button pin configuration table:
- *   - Buttons interrupts are configured to trigger on falling edge.
- */
-PIN_Config buttonPinTable[] = {
-    Board_BUTTON0 | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
-    Board_BUTTON1 | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
-    PIN_TERMINATE
-};
-
-// Clock objects for debouncing the buttons
-static Clock_Struct button0DebounceClock;
-static Clock_Struct button1DebounceClock;
-
-// State of the buttons
-static uint8_t button0State = 0;
-static uint8_t button1State = 0;
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -309,10 +281,6 @@ static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                               uint8_t *pData);
 static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport);
 static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport);
-
-static void F91Kepler_processButtonPress(button_state_t *buttonInfo);
-static void buttonCallbackFxn(PIN_Handle handle, PIN_Id pinId);
-static void buttonDebounceSwiFxn(UArg buttonId);
 
 /*********************************************************************
  * EXTERN FUNCTIONS
@@ -586,6 +554,9 @@ static void F91Kepler_init(void)
   //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Clock module.");
   F91Clock_init();
 
+  //Setup the buttons
+  F91Buttons_init();
+
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
   // function with GAPROLE_IRK or GAPROLE_SRK parameter - Perform
@@ -622,38 +593,6 @@ static void F91Kepler_init(void)
   // loop
   HCI_LE_ReadLocalSupportedFeaturesCmd();
 #endif // !defined (USE_LL_CONN_PARAM_UPDATE)
-
-  // Init buttons.
-  buttonPinHandle = PIN_open(&buttonPinState, buttonPinTable);
-  if(!buttonPinHandle) {
-    Display_print0(F91_LOGGER, 0, 0, "Error occured opening button pin!");
-    Task_exit();
-  }
-
-  if (PIN_registerIntCb(buttonPinHandle, &buttonCallbackFxn) != 0) {
-    Display_print0(F91_LOGGER, 0, 0, "Error occured registering button callback!");
-    Task_exit();
-  }
-
-    // Create the debounce clock objects for Button 0 and Button 1
-  Clock_Params clockParams;
-  Clock_Params_init(&clockParams);
-
-  // Both clock objects use the same callback, so differentiate on argument
-  // given to the callback in Swi context
-  clockParams.arg = Board_BUTTON0;
-
-  // Initialize to 50 ms timeout when Clock_start is called.
-  // Timeout argument is in ticks, so convert from ms to ticks via tickPeriod.
-  Clock_construct(&button0DebounceClock, buttonDebounceSwiFxn,
-                  50 * (1000/Clock_tickPeriod),
-                  &clockParams);
-
-  // Second button
-  clockParams.arg = Board_BUTTON1;
-  Clock_construct(&button1DebounceClock, buttonDebounceSwiFxn,
-                  50 * (1000/Clock_tickPeriod),
-                  &clockParams);
 
   Display_print0(F91_LOGGER, 0, 0, "F91 Smart Watch");
 }
@@ -937,7 +876,7 @@ static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
 
     case F91_BUTTON_PRESS_EVT:
       {
-        F91Kepler_processButtonPress((button_state_t *)(pMsg->pData));
+        F91Buttons_processButtonPress((button_state_t *)(pMsg->pData));
 
         ICall_free(pMsg->pData);
         break;
@@ -1197,6 +1136,22 @@ void F91Kepler_clockCharValueChangeCB(uint8_t paramID)
 }
 
 /*********************************************************************
+ * @fn      F91Kepler_buttonValueChangeCB
+ *
+ * @brief   Callback indicating a button
+ *          value change.
+ *
+ * @param   paramID - parameter ID of the value that was changed.
+ *
+ * @return  None.
+ */
+void F91Kepler_buttonValueChangeCB(uint8_t *pData)
+{
+  F91Kepler_enqueueMsg(F91_BUTTON_PRESS_EVT, 0, (uint8_t *) pData);
+}
+
+
+/*********************************************************************
  * @fn      F91Kepler_processCharValueChangeEvt
  *
  * @brief   Process a pending Simple Profile characteristic value change
@@ -1400,129 +1355,5 @@ static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
   return FALSE;
 }
 
-/*********************************************************************
- * @fn      F91Kepler_processButtonPress
- *
- * @brief   Process button press event.
- *
- * @param buttonInfo pointer to info on what button was pressed and state
- */
-static void F91Kepler_processButtonPress(button_state_t *buttonInfo)
-{
-  Display_print1(F91_LOGGER, 7, 0, "BUTTON: %d", buttonInfo->pinId);
-  Display_print1(F91_LOGGER, 8, 0, "STATE: %d", buttonInfo->state);
-  
-  //TO-DO: HANDLE BUTTON PRESS LOGIC HERE
-}
-
-
-/*********************************************************************
- * @fn      buttonDebounceSwiFxn
- * 
- * @brief  Callback from Clock module on timeout
- *
- *         Determines new state after debouncing
- *
- * @param  buttonId    The pin being debounced
- */
-static void buttonDebounceSwiFxn(UArg buttonId)
-{
-  // Used to send message to app
-  button_state_t buttonMsg = { .pinId = buttonId };
-  uint8_t        sendMsg   = FALSE;
-
-  // Get current value of the button pin after the clock timeout
-  uint8_t buttonPinVal = PIN_getInputValue(buttonId);
-
-  // Set interrupt direction to opposite of debounced state
-  // If button is now released (button is active low, so release is high)
-  if (buttonPinVal)
-  {
-    // Enable negative edge interrupts to wait for press
-    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_NEGEDGE);
-  }
-  else
-  {
-    // Enable positive edge interrupts to wait for relesae
-    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_POSEDGE);
-  }
-
-  switch(buttonId)
-  {
-    case Board_BUTTON0:
-      // If button is now released (buttonPinVal is active low, so release is 1)
-      // and button state was pressed (buttonstate is active high so press is 1)
-      if (buttonPinVal && button0State)
-      {
-        // Button was released
-        buttonMsg.state = button0State = 0;
-        sendMsg = TRUE;
-      }
-      else if (!buttonPinVal && !button0State)
-      {
-        // Button was pressed
-        buttonMsg.state = button0State = 1;
-        sendMsg = TRUE;
-      }
-      break;
-
-    case Board_BUTTON1:
-      // If button is now released (buttonPinVal is active low, so release is 1)
-      // and button state was pressed (buttonstate is active high so press is 1)
-      if (buttonPinVal && button1State)
-      {
-        // Button was released
-        buttonMsg.state = button1State = 0;
-        sendMsg = TRUE;
-      }
-      else if (!buttonPinVal && !button1State)
-      {
-        // Button was pressed
-        buttonMsg.state = button1State = 1;
-        sendMsg = TRUE;
-      }
-      break;
-  }
-
-  if (sendMsg == TRUE)
-  {
-      button_state_t *pData;
-    // Allocate space for the event data.
-    if ((pData = ICall_malloc(sizeof(button_state_t))))
-    {
-      *pData =  buttonMsg;
-
-      // Queue the event.
-      F91Kepler_enqueueMsg(F91_BUTTON_PRESS_EVT, 0, (uint8_t *) pData);
-    }
-  }
-}
-
-/*********************************************************************
- * @fn      buttonCallbackFxn
- * 
- * @brief  Callback from PIN driver on interrupt
- *
- *         Sets in motion the debouncing.
- *
- * @param  handle    The PIN_Handle instance this is about
- * @param  pinId     The pin that generated the interrupt
- */
-static void buttonCallbackFxn(PIN_Handle handle, PIN_Id pinId)
-{
-  // Disable interrupt on that pin for now. Re-enabled after debounce.
-  PIN_setConfig(handle, PIN_BM_IRQ, pinId | PIN_IRQ_DIS);
-
-  // Start debounce timer
-  switch (pinId)
-  {
-    case Board_BUTTON0:
-      Clock_start(Clock_handle(&button0DebounceClock));
-      break;
-    case Board_BUTTON1:
-      Clock_start(Clock_handle(&button1DebounceClock));
-      break;
-  }
-}
 /*********************************************************************
 *********************************************************************/
