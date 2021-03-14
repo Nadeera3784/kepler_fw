@@ -106,8 +106,11 @@ static ICall_SyncHandle syncEvent;
 // Time Zone
 static uint16_t TimeZone;
 
-// For clock
+// For clock (24/12hr mode)
 static bool TimeMode = true;
+
+// Daylight Saving
+static bool Dst = false;
 
 /*********************************************************************
  * LOCAL FUNCTIONS
@@ -118,8 +121,10 @@ static void F91Clock_doTime(void);
 static void F91Clock_setTime(uint32_t time);
 static void F91Clock_setTimeZone(uint16_t zone);
 static void F91Clock_setTimeMode(uint8_t mode);
+static void F91Clock_setDst(uint8_t mode);
 static uint16_t F91Clock_getTimeZone( void );
 static bool F91Clock_getTimeMode( void );
+static bool F91Clock_getDst( void );
 
 
 /*********************************************************************
@@ -177,6 +182,33 @@ static void F91Clock_setTimeMode(uint8_t mode)
 }
 
 /*********************************************************************
+ * @fn      F91Clock_setDaylightSavings
+ *
+ * @brief   Sets daylight savings for the clock 
+ *
+ * @param   mode - (0: 12hr  1: 24hr).
+ *
+ */
+static void F91Clock_setDst(uint8_t mode)
+{
+    switch ( mode )
+    {
+        case 0:
+            Dst = false;
+        break;
+        case 1:
+            Dst = true;
+        break;
+        default:
+            mode = 0;
+            Dst = false;
+        break;
+    }
+
+    F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR3, 1, &mode);
+}
+
+/*********************************************************************
  * @fn      F91Clock_getTimeZone
  *
  * @brief   Returns time zone
@@ -189,11 +221,24 @@ static uint16_t F91Clock_getTimeZone( void )
     return TimeZone;
 }
 
+/*********************************************************************
+ * @fn      F91Clock_getDst
+ *
+ * @brief   Returns daylight savings state.
+ *
+ * @param   none
+ *
+ */
+static bool F91Clock_getDst( void )
+{
+    return Dst;
+}
+
 
 /*********************************************************************
- * @fn      F91Clock_getTimeZone
+ * @fn      F91Clock_getTimeMode
  *
- * @brief   Returns time zone
+ * @brief   Returns the mode to display clock (24 or 12 hr)
  *
  * @param   none
  *
@@ -250,6 +295,7 @@ static void F91Clock_internal_init(void)
     F91Clock_setTime(DEFAULT_TIME);
     F91Clock_setTimeZone(TZ_PST);
     F91Clock_setTimeMode(0);
+    F91Clock_setDst(0);
     //***********************************************************
 }
 
@@ -267,10 +313,17 @@ static void F91Clock_doTime(void) {
     
     t1 = time(NULL);
     t1 = t1 - F91Clock_getTimeZone();
+
+    //Handle daylight savings
+    if(F91Clock_getDst()){
+        t1 += 3600;
+    }
+
     ltm = localtime(&t1);
     timeInSeconds = Seconds_get();
     eraseFirstDigit = false;
 
+    //Handle 24hr or 12 hr time.
     if((!F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
         ltm->tm_hour = ltm->tm_hour - 12;
         ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
@@ -413,6 +466,9 @@ void F91Clock_processCharChangeEvt(uint8_t paramID)
     case F91_CLOCK_SERVICE_CHAR3:
       F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR3, &mode);
       F91Clock_setTimeMode(mode);
+    case F91_CLOCK_SERVICE_CHAR4:
+      F91_clock_service_GetParameter(F91_CLOCK_SERVICE_CHAR4, &mode);
+      F91Clock_setDst(mode);
       break;
     default:
       break;

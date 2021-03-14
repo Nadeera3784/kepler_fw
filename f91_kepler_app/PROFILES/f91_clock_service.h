@@ -60,7 +60,8 @@ extern "C"
 // Profile Parameters
 #define F91_CLOCK_SERVICE_CHAR1                 0  // RW uint8 - Profile Characteristic 1 value (Time)
 #define F91_CLOCK_SERVICE_CHAR2                 1  // RW uint8 - Profile Characteristic 2 value (Time zone)
-#define F91_CLOCK_SERVICE_CHAR3                 2  // RW uint8 - Profile Characteristic 2 value (Time mode)
+#define F91_CLOCK_SERVICE_CHAR3                 2  // RW uint8 - Profile Characteristic 3 value (Time mode)
+#define F91_CLOCK_SERVICE_CHAR4                 3  // RW uint8 - Profile Characteristic 4 value (Daylight savings)
 
 // Service UUID
 #define F91_CLOCK_SERVICE_UUID                  0xB2F0
@@ -69,7 +70,7 @@ extern "C"
 #define F91_CLOCK_SERVICE_CHAR1_UUID            0xB2F1
 #define F91_CLOCK_SERVICE_CHAR2_UUID            0xB2F2
 #define F91_CLOCK_SERVICE_CHAR3_UUID            0xB2F3
-
+#define F91_CLOCK_SERVICE_CHAR4_UUID            0xB2F4
 
 /*********************************************************************
  * TYPEDEFS

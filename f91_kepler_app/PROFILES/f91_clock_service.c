@@ -62,7 +62,7 @@
  * CONSTANTS
  */
 
-#define SERVAPP_NUM_ATTR_SUPPORTED       10
+#define SERVAPP_NUM_ATTR_SUPPORTED       13
 
 /*********************************************************************
  * TYPEDEFS
@@ -90,10 +90,16 @@ CONST uint8_t f91_clock_serviceChar2UUID[ATT_UUID_SIZE] =
  F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR2_UUID)
 };
 
-// Characteristic 2 UUID: 0xB2F3
+// Characteristic 3 UUID: 0xB2F3
 CONST uint8_t f91_clock_serviceChar3UUID[ATT_UUID_SIZE] =
 {
  F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR3_UUID)
+};
+
+// Characteristic 4 UUID: 0xB2F4
+CONST uint8_t f91_clock_serviceChar4UUID[ATT_UUID_SIZE] =
+{
+ F91_BASE_UUID_128(F91_CLOCK_SERVICE_CHAR4_UUID)
 };
 /*********************************************************************
  * LOCAL VARIABLES
@@ -135,8 +141,14 @@ static uint8_t f91ClockServiceChar3 = 0;
 // F91 Characteristic 3 User Description
 static uint8_t f91ClockServiceUserDesp3[14] = "F91 Time Mode";
 
+// F91 Clock Characteristic 4 Properties
+static uint8_t f91ClockServiceChar4Props = GATT_PROP_READ | GATT_PROP_WRITE;
 
+// Characteristic 4 Value
+static uint8_t f91ClockServiceChar4 = 0;
 
+// F91 Characteristic 4 User Description
+static uint8_t f91ClockServiceUserDesp4[8] = "F91 DST";
 
 /*********************************************************************
 * Profile Attributes - Table
@@ -174,7 +186,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
         f91ClockServiceUserDesp1
       },
   
-    // Characteristic 2 Declaration
+  // Characteristic 2 Declaration
   {
     { ATT_BT_UUID_SIZE, characterUUID },
     GATT_PERMIT_READ,
@@ -196,7 +208,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
         f91ClockServiceUserDesp2
       },
   
-      // Characteristic 3 Declaration
+  // Characteristic 3 Declaration
   {
     { ATT_BT_UUID_SIZE, characterUUID },
     GATT_PERMIT_READ,
@@ -210,12 +222,34 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
         0,
         &f91ClockServiceChar3
       },
-      // Characteristic 2 User Description
+      // Characteristic 3 User Description
       {
         { ATT_BT_UUID_SIZE, charUserDescUUID },
         GATT_PERMIT_READ,
         0,
         f91ClockServiceUserDesp3
+      },
+
+  // Characteristic 4 Declaration
+  {
+    { ATT_BT_UUID_SIZE, characterUUID },
+    GATT_PERMIT_READ,
+    0,
+    &f91ClockServiceChar4Props
+  },
+      // Characteristic Value 4
+      {
+        { ATT_UUID_SIZE, f91_clock_serviceChar4UUID },
+        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        0,
+        &f91ClockServiceChar4
+      },
+      // Characteristic 4 User Description
+      {
+        { ATT_BT_UUID_SIZE, charUserDescUUID },
+        GATT_PERMIT_READ,
+        0,
+        f91ClockServiceUserDesp4
       },
 };
 
@@ -327,6 +361,16 @@ bStatus_t F91_clock_service_SetParameter( uint8_t param, uint16_t len, void *val
         ret = bleInvalidRange;
       }
       break;
+    case F91_CLOCK_SERVICE_CHAR4:
+      if ( len == sizeof ( uint8_t ) )
+      {
+        f91ClockServiceChar4 = *((uint8_t*)value);
+      }
+      else
+      {
+        ret = bleInvalidRange;
+      }
+      break;
     default:
       ret = INVALIDPARAMETER;
       break;
@@ -357,6 +401,9 @@ bStatus_t F91_clock_service_GetParameter( uint8_t param, void *value )
       break;
     case F91_CLOCK_SERVICE_CHAR3:
         *((uint8_t*)value) = f91ClockServiceChar3;
+      break;
+    case F91_CLOCK_SERVICE_CHAR4:
+        *((uint8_t*)value) = f91ClockServiceChar4;
       break;
     default:
       ret = INVALIDPARAMETER;
@@ -404,6 +451,9 @@ static bStatus_t f91_clock_service_ReadAttrCB( uint16_t connHandle, gattAttribut
     } else if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar3UUID, ATT_UUID_SIZE)) {
       *pLen = 1;
       pValue[0] = *pAttr->pValue;
+    } else if (!memcmp(pAttr->type.uuid, f91_clock_serviceChar4UUID, ATT_UUID_SIZE)) {
+      *pLen = 1;
+      pValue[0] = *pAttr->pValue;
     } 
   }
 
@@ -445,6 +495,12 @@ static bStatus_t f91_clock_service_WriteAttrCB( uint16_t connHandle, gattAttribu
           *pCurValue = pValue[0];
           if( pAttr->pValue == &f91ClockServiceChar3 ) {
             notifyApp = F91_CLOCK_SERVICE_CHAR3;
+          }
+      } else if(!memcmp(pAttr->type.uuid, f91_clock_serviceChar4UUID, ATT_UUID_SIZE)) {
+          uint8_t *pCurValue = (uint8_t *)pAttr->pValue;
+          *pCurValue = pValue[0];
+          if( pAttr->pValue == &f91ClockServiceChar4 ) {
+            notifyApp = F91_CLOCK_SERVICE_CHAR4;
           }
       } else {
           status = ATT_ERR_INVALID_HANDLE;
