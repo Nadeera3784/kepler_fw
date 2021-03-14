@@ -22,6 +22,7 @@
  * INCLUDES
  */
 #include "ssd1306.h"
+#include "util.h"
 #include "f91_utils.h"
 #include "f91_kepler.h"
 #include "f91_buttons.h"
@@ -42,6 +43,7 @@
 /*********************************************************************
  * CONSTANTS
  */
+#define DISPLAY_TIMEOUT 5000 //5 seconds 
 
 /*********************************************************************
  * TYPEDEFS
@@ -73,6 +75,9 @@ PIN_Config buttonPinTable[] = {
 static Clock_Struct button0DebounceClock;
 static Clock_Struct button1DebounceClock;
 
+// Clock object used to signal display timeout
+static Clock_Struct startDispClock;
+
 // State of the buttons
 static uint8_t button0State = 0;
 static uint8_t button1State = 0;
@@ -83,6 +88,7 @@ static uint8_t button1State = 0;
 
 static void F91Buttons_buttonCallbackFxn(PIN_Handle handle, PIN_Id pinId);
 static void F91Buttons_buttonDebounceSwiFxn(UArg buttonId);
+static void F91Buttons_clockChangeDisplayCallbackFxn(UArg state);
 
 
 /*********************************************************************
@@ -192,6 +198,24 @@ static void F91Buttons_buttonCallbackFxn(PIN_Handle handle, PIN_Id pinId)
 }
 
 /*********************************************************************
+ * @fn      F91Buttons_clockChangeDisplayCallbackFxn
+ * 
+ * @brief  Callback from clock to change display state
+ *
+ *         Sets in motion the debouncing.
+ *
+ * @param  handle    The PIN_Handle instance this is about
+ * @param  pinId     The pin that generated the interrupt
+ */
+static void F91Buttons_clockChangeDisplayCallbackFxn(UArg state)
+{   
+    //As Clock functions execute in either a Swi or Hwi context, they are not permitted to call blocking APIs!!!
+    // I2C call is blocking unless we use a callback transferMode, which I DO NOT want to...
+    // So trigger an event and let the F91_Kepler task handle turning the display back off.
+    F91Kepler_displayStateChangeCB();
+}
+
+/*********************************************************************
  *  EXTERN FUNCTIONS
  */
 
@@ -227,6 +251,10 @@ void F91Buttons_init( void ) {
     Clock_construct(&button1DebounceClock, F91Buttons_buttonDebounceSwiFxn,
                     50 * (1000/Clock_tickPeriod),
                     &clockParams);
+
+    //Setup one-shot clock to turn off display after set time upon button press.
+    Util_constructClock(&startDispClock, F91Buttons_clockChangeDisplayCallbackFxn,
+                    0, 0, false, NULL);
 }
 
 /*********************************************************************
@@ -238,10 +266,15 @@ void F91Buttons_init( void ) {
  */
 void F91Buttons_processButtonPress(button_state_t *buttonInfo)
 {
-  Display_print1(F91_LOGGER, 7, 0, "BUTTON: %d", buttonInfo->pinId);
-  Display_print1(F91_LOGGER, 8, 0, "STATE: %d", buttonInfo->state);
-  
-  //TO-DO: HANDLE BUTTON PRESS LOGIC HERE
+    Display_print1(F91_LOGGER, 7, 0, "BUTTON: %d", buttonInfo->pinId);
+    Display_print1(F91_LOGGER, 8, 0, "STATE: %d", buttonInfo->state);
+
+    //If button (14 for now) is pressed, toggle display ON and start the one-shot clock for 5 seconds.
+    // This one shot clock then triggers an event to turn display off.
+    if (buttonInfo->pinId == 14) {
+        ssd1306_toggle_display(true);
+        Util_restartClock(&startDispClock, DISPLAY_TIMEOUT);
+    }
 }
 
 /*********************************************************************

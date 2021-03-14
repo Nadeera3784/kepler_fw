@@ -142,6 +142,7 @@
 #define F91_CONN_EVT                          (1 << 4)
 #define F91_CLOCK_CHAR_CHANGE_EVT             (1 << 5)
 #define F91_BUTTON_PRESS_EVT                  (1 << 6)
+#define F91_SSD1306_DISPLAY_EVT               (1 << 7)
 
 // Internal Events for RTOS application
 #define F91_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
@@ -881,7 +882,12 @@ static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
         ICall_free(pMsg->pData);
         break;
       }
-    
+
+    case F91_SSD1306_DISPLAY_EVT:
+      {
+        ssd1306_toggle_display(false);
+      }
+      break;
     // Pairing event
     case F91_PAIRING_STATE_EVT:
       {
@@ -1150,6 +1156,19 @@ void F91Kepler_buttonValueChangeCB(uint8_t *pData)
   F91Kepler_enqueueMsg(F91_BUTTON_PRESS_EVT, 0, (uint8_t *) pData);
 }
 
+/*********************************************************************
+ * @fn      F91Kepler_displayStateChangeCB
+ *
+ * @brief   Callback indicating the display state has been requested.
+ *
+ * @param   None.
+ * 
+ * @return  None.
+ */
+void F91Kepler_displayStateChangeCB( void )
+{
+  F91Kepler_enqueueMsg(F91_SSD1306_DISPLAY_EVT, 0, 0);
+}
 
 /*********************************************************************
  * @fn      F91Kepler_processCharValueChangeEvt

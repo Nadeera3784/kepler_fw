@@ -100,6 +100,10 @@ extern void F91Kepler_clockCharValueChangeCB(uint8_t paramID);
  */
 extern void F91Kepler_buttonValueChangeCB(uint8_t *pData);
 
+/*
+ * Function to call when a display state change has been requested.
+ */
+extern void F91Kepler_displayStateChangeCB( void );
 /*********************************************************************
 *********************************************************************/
 

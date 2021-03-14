@@ -98,7 +98,7 @@ I2C_Transaction         i2c_transaction;
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
-void ssd1306_command(uint8_t);
+void ssd1306_command(uint8_t command);
 void ssd1306_clear_buffer(uint8_t *buffer, int size);
 void ssd1306_send_buffer(uint8_t *buffer, int size);
 void ssd1306_draw_pixel(uint8_t x, uint8_t y, bool erase);
@@ -155,6 +155,7 @@ void ssd1306_send_buffer(uint8_t *buffer, int size) {
     i2c_transaction.slaveAddress = SSD1306_I2C_ADDR;
     if (!I2C_transfer(i2c_connection, &i2c_transaction)) {
         /* Could not send command to SSD1306, error */
+        Display_print0(F91_LOGGER, 9, 0, "ERROR OCCURED");
         while(1);
     }
 }
@@ -304,8 +305,8 @@ void ssd1306_init(void) {//Init Sequence
         ssd1306_command(SET_MEM_ADDR);
         ssd1306_command(0x10);
 
-        //Set Display On
-        ssd1306_command(SET_DISP_ON);
+        //Set Display Off (default)
+        ssd1306_command(SET_DISP_OFF);
         // //Display_print0(F91_LOGGER, 0, 0, "Init complete!");
 
         ssd1306_clear();
