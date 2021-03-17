@@ -1,32 +1,12 @@
 /******************************************************************************
 
- @file  simple_peripheral.h
+ @file  f91_buttons.h
 
- @brief This file contains the Simple Peripheral sample application
-        definitions and prototypes.
+ @brief This file contains the F91 Kepler Smart Watch button press handlers.
 
- Group: WCS, BTS
  Target Device: cc2640r2
 
  ******************************************************************************
- 
- Copyright (c) 2013-2021, Texas Instruments Incorporated
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
-
- *  Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
-
- *  Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in the
-    documentation and/or other materials provided with the distribution.
-
- *  Neither the name of Texas Instruments Incorporated nor the names of
-    its contributors may be used to endorse or promote products derived
-    from this software without specific prior written permission.
 
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
@@ -45,8 +25,8 @@
  
  *****************************************************************************/
 
-#ifndef SIMPLEPERIPHERAL_H
-#define SIMPLEPERIPHERAL_H
+#ifndef F91BUTTONS_H
+#define F91BUTTONS_H
 
 #ifdef __cplusplus
 extern "C"
@@ -56,6 +36,21 @@ extern "C"
 /*********************************************************************
  * INCLUDES
  */
+
+#include <ti/drivers/PIN.h>
+
+#include "board.h"
+#include "f91_kepler.h"
+
+/*********************************************************************
+*  TYPEDEFS
+*/
+
+typedef struct
+{
+    PIN_Id   pinId;
+    uint8_t  state;
+} button_state_t;
 
 /*********************************************************************
 *  EXTERNAL VARIABLES
@@ -73,11 +68,9 @@ extern "C"
  * FUNCTIONS
  */
 
-/*
- * Task creation function for the Simple Peripheral.
- */
-extern void SimplePeripheral_createTask(void);
-
+extern void F91Buttons_init( void );
+extern void F91Buttons_processButtonPress(button_state_t *buttonInfo);
+extern void F91Buttons_resetOneShot( void );
 
 /*********************************************************************
 *********************************************************************/
@@ -86,4 +79,4 @@ extern void SimplePeripheral_createTask(void);
 }
 #endif
 
-#endif /* SIMPLEPERIPHERAL_H */
+#endif /* F91BUTTONS_H */

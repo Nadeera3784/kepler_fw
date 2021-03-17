@@ -48,20 +48,31 @@
  * INCLUDES
  */
 
+
+/* XDC module Headers */
 #include <xdc/runtime/Error.h>
+#include <xdc/std.h>
+#include <xdc/runtime/System.h>
 
 #include <ti/drivers/Power.h>
 #include <ti/drivers/power/PowerCC26XX.h>
+#include <ti/drivers/GPIO.h>
+#include <ti/drivers/I2C.h>
+
 #include <ti/sysbios/BIOS.h>
 #include <ti/sysbios/knl/Clock.h>
+#include <ti/sysbios/knl/Mailbox.h>
 #include <ti/display/Display.h>
+
+#include "Board.h"
 
 #include <icall.h>
 #include "hal_assert.h"
 #include "bcomdef.h"
 #include "peripheral.h"
-#include "simple_peripheral.h"
-
+#include "f91_kepler.h"
+#include "f91_clock.h"
+#include "f91_utils.h"
 /* Header files required to enable instruction fetch cache */
 #include <inc/hw_memmap.h>
 #include <driverlib/vims.h>
@@ -99,7 +110,6 @@ bleUserCfg_t user0Cfg = BLE_USER_CFG;
   //
   #define SET_RFC_BLE_MODE(mode) HWREG( PRCM_BASE + PRCM_O_RFCMODESEL ) = (mode)
 #endif // USE_FPGA
-
 /*******************************************************************************
  * TYPEDEFS
  */
@@ -111,6 +121,15 @@ bleUserCfg_t user0Cfg = BLE_USER_CFG;
 /*******************************************************************************
  * GLOBAL VARIABLES
  */
+Display_Handle F91_LOGGER = NULL;
+Semaphore_Struct semStruct;
+Semaphore_Handle semHandle;
+
+/* This buffer is not directly accessed by the application */
+MailboxMsgObj mailboxBuffer[NUMMSGS];
+
+Mailbox_Struct mbxStruct;
+Mailbox_Handle mbxHandle;
 
 #ifdef CC1350_LAUNCHXL
 #ifdef POWER_SAVING
@@ -133,10 +152,7 @@ PIN_Handle radCtrlHandle;
 /*******************************************************************************
  * EXTERNS
  */
-
 extern void AssertHandler(uint8 assertCause, uint8 assertSubcause);
-
-extern Display_Handle dispHandle;
 
 /*******************************************************************************
  * @fn          Main
@@ -164,6 +180,9 @@ int main()
   RegisterAssertCback(AssertHandler);
 
   Board_initGeneral();
+
+  GPIO_init();
+  I2C_init();
 
 #ifdef CC1350_LAUNCHXL
   // Enable 2.4GHz Radio
@@ -205,6 +224,23 @@ int main()
   user0Cfg.appServiceInfo->timerTickPeriod = Clock_tickPeriod;
   user0Cfg.appServiceInfo->timerMaxMillisecond  = ICall_getMaxMSecs();
 #endif  /* ICALL_JT */
+  
+  //Contrust a mailbox object to be used to communicate across tasks.
+  Mailbox_Params mbxParams;
+  Mailbox_Params_init(&mbxParams);
+  mbxParams.buf = (Ptr)mailboxBuffer;
+  mbxParams.bufSize = sizeof(mailboxBuffer);
+  Mailbox_construct(&mbxStruct, sizeof(MsgObj), NUMMSGS, &mbxParams, NULL);
+  mbxHandle = Mailbox_handle(&mbxStruct);
+
+  /* Construct a Semaphore object to be use as a resource lock, inital count 1 */
+  Semaphore_Params semParams;
+  Semaphore_Params_init(&semParams);
+  Semaphore_construct(&semStruct, 1, &semParams);
+
+    /* Obtain instance handle */
+  semHandle = Semaphore_handle(&semStruct);
+  
   /* Initialize ICall module */
   ICall_init();
 
@@ -214,7 +250,11 @@ int main()
   /* Kick off profile - Priority 3 */
   GAPRole_createTask();
 
-  SimplePeripheral_createTask();
+  /* Kick off clock application - Priority 2 */
+  F91Clock_createTask();
+
+  /* Kick off main smart watch application - Priority 1 */
+  F91Kepler_createTask();
 
   /* enable interrupts and start SYS/BIOS */
   BIOS_start();
@@ -263,12 +303,11 @@ void AssertHandler(uint8 assertCause, uint8 assertSubcause)
 {
 #if !defined(Display_DISABLE_ALL)
   // Open the display if the app has not already done so
-  if ( !dispHandle )
-  {
-    dispHandle = Display_open(Display_Type_LCD, NULL);
+  if ( !F91_LOGGER ) {
+    F91_LOGGER = Display_open(Display_Type_UART, NULL);
   }
 
-  Display_print0(dispHandle, 0, 0, ">>>STACK ASSERT");
+  Display_print0(F91_LOGGER, 0, 0, ">>>STACK ASSERT");
 #endif // ! Display_DISABLE_ALL
 
   // check the assert cause
@@ -276,8 +315,8 @@ void AssertHandler(uint8 assertCause, uint8 assertSubcause)
   {
     case HAL_ASSERT_CAUSE_OUT_OF_MEMORY:
 #if !defined(Display_DISABLE_ALL)
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> OUT OF MEMORY!");
+      Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+      Display_print0(F91_LOGGER, 2, 0, ">> OUT OF MEMORY!");
 #endif // ! Display_DISABLE_ALL
       break;
 
@@ -286,47 +325,47 @@ void AssertHandler(uint8 assertCause, uint8 assertSubcause)
       if (assertSubcause == HAL_ASSERT_SUBCAUSE_FW_INERNAL_ERROR)
       {
 #if !defined(Display_DISABLE_ALL)
-        Display_print0(dispHandle, 0, 0, "***ERROR***");
-        Display_print0(dispHandle, 2, 0, ">> INTERNAL FW ERROR!");
+        Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+        Display_print0(F91_LOGGER, 2, 0, ">> INTERNAL FW ERROR!");
 #endif // ! Display_DISABLE_ALL
       }
       else
       {
 #if !defined(Display_DISABLE_ALL)
-        Display_print0(dispHandle, 0, 0, "***ERROR***");
-        Display_print0(dispHandle, 2, 0, ">> INTERNAL ERROR!");
+        Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+        Display_print0(F91_LOGGER, 2, 0, ">> INTERNAL ERROR!");
 #endif // ! Display_DISABLE_ALL
       }
       break;
 
     case HAL_ASSERT_CAUSE_ICALL_ABORT:
 #if !defined(Display_DISABLE_ALL)
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> ICALL ABORT!");
+      Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+      Display_print0(F91_LOGGER, 2, 0, ">> ICALL ABORT!");
 #endif // ! Display_DISABLE_ALL
       HAL_ASSERT_SPINLOCK;
       break;
 
     case HAL_ASSERT_CAUSE_ICALL_TIMEOUT:
 #if !defined(Display_DISABLE_ALL)
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> ICALL TIMEOUT!");
+      Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+      Display_print0(F91_LOGGER, 2, 0, ">> ICALL TIMEOUT!");
 #endif // ! Display_DISABLE_ALL
       HAL_ASSERT_SPINLOCK;
       break;
 
     case HAL_ASSERT_CAUSE_WRONG_API_CALL:
 #if !defined(Display_DISABLE_ALL)
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> WRONG API CALL!");
+      Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+      Display_print0(F91_LOGGER, 2, 0, ">> WRONG API CALL!");
 #endif // ! Display_DISABLE_ALL
       HAL_ASSERT_SPINLOCK;
       break;
 
   default:
 #if !defined(Display_DISABLE_ALL)
-      Display_print0(dispHandle, 0, 0, "***ERROR***");
-      Display_print0(dispHandle, 2, 0, ">> DEFAULT SPINLOCK!");
+      Display_print0(F91_LOGGER, 0, 0, "***ERROR***");
+      Display_print0(F91_LOGGER, 2, 0, ">> DEFAULT SPINLOCK!");
 #endif // ! Display_DISABLE_ALL
       HAL_ASSERT_SPINLOCK;
   }

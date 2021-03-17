@@ -1,11 +1,9 @@
 /******************************************************************************
 
- @file  simple_peripheral.c
+ @file  f91_kepler.c
 
- @brief This file contains the Simple Peripheral sample application for use
-        with the CC2650 Bluetooth Low Energy Protocol Stack.
+ @brief This file contains the F91 Kepler Smart Watch application
 
- Group: WCS, BTS
  Target Device: cc2640r2
 
  ******************************************************************************
@@ -55,6 +53,7 @@
 #include <ti/sysbios/knl/Event.h>
 #include <ti/sysbios/knl/Queue.h>
 #include <ti/display/Display.h>
+#include <ti/sysbios/BIOS.h>
 
 #if defined( USE_FPGA ) || defined( DEBUG_SW_TRACE )
 #include <driverlib/ioc.h>
@@ -68,7 +67,6 @@
 #include "icall_ble_api.h"
 
 #include "devinfoservice.h"
-#include "simple_gatt_profile.h"
 #include "ll_common.h"
 
 #include "peripheral.h"
@@ -81,7 +79,15 @@
 
 #include "board.h"
 
-#include "simple_peripheral.h"
+#include "f91_kepler.h"
+#include "f91_notification.h"
+#include "f91_notification_service.h"
+#include "f91_clock.h"
+#include "f91_clock_service.h"
+#include "f91_buttons.h"
+#include "f91_utils.h"
+#include "ssd1306.h"
+
 
 /*********************************************************************
  * CONSTANTS
@@ -116,47 +122,37 @@
 #define DEFAULT_CONN_PAUSE_PERIPHERAL         6
 
 // How often to perform periodic event (in msec)
-#define SBP_PERIODIC_EVT_PERIOD               5000
+#define F91_PERIODIC_EVT_PERIOD               5000
 
 // Application specific event ID for HCI Connection Event End Events
-#define SBP_HCI_CONN_EVT_END_EVT              0x0001
-
-// Type of Display to open
-#if !defined(Display_DISABLE_ALL)
-  #if defined(BOARD_DISPLAY_USE_LCD) && (BOARD_DISPLAY_USE_LCD!=0)
-    #define SBP_DISPLAY_TYPE Display_Type_LCD
-  #elif defined (BOARD_DISPLAY_USE_UART) && (BOARD_DISPLAY_USE_UART!=0)
-    #define SBP_DISPLAY_TYPE Display_Type_UART
-  #else // !BOARD_DISPLAY_USE_LCD && !BOARD_DISPLAY_USE_UART
-    #define SBP_DISPLAY_TYPE 0 // Option not supported
-  #endif // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
-#else // BOARD_DISPLAY_USE_LCD && BOARD_DISPLAY_USE_UART
-  #define SBP_DISPLAY_TYPE 0 // No Display
-#endif // !Display_DISABLE_ALL
+#define F91_HCI_CONN_EVT_END_EVT              0x0001
 
 // Task configuration
-#define SBP_TASK_PRIORITY                     1
+#define F91_TASK_PRIORITY                     2
 
-#ifndef SBP_TASK_STACK_SIZE
-#define SBP_TASK_STACK_SIZE                   644
+#ifndef F91_TASK_STACK_SIZE
+#define F91_TASK_STACK_SIZE                   644
 #endif
 
 // Application events
-#define SBP_STATE_CHANGE_EVT                  0x0001
-#define SBP_CHAR_CHANGE_EVT                   0x0002
-#define SBP_PAIRING_STATE_EVT                 0x0004
-#define SBP_PASSCODE_NEEDED_EVT               0x0008
-#define SBP_CONN_EVT                          0x0010
+#define F91_STATE_CHANGE_EVT                  (1 << 0)
+#define F91_NOTIFICATION_CHAR_CHANGE_EVT      (1 << 1)
+#define F91_PAIRING_STATE_EVT                 (1 << 2)
+#define F91_PASSCODE_NEEDED_EVT               (1 << 3)
+#define F91_CONN_EVT                          (1 << 4)
+#define F91_CLOCK_CHAR_CHANGE_EVT             (1 << 5)
+#define F91_BUTTON_PRESS_EVT                  (1 << 6)
+#define F91_SSD1306_DISPLAY_EVT               (1 << 7)
 
 // Internal Events for RTOS application
-#define SBP_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
-#define SBP_QUEUE_EVT                         UTIL_QUEUE_EVENT_ID // Event_Id_30
-#define SBP_PERIODIC_EVT                      Event_Id_00
+#define F91_ICALL_EVT                         ICALL_MSG_EVENT_ID // Event_Id_31
+#define F91_QUEUE_EVT                         UTIL_QUEUE_EVENT_ID // Event_Id_30
+#define F91_PERIODIC_EVT                      Event_Id_00
 
 // Bitwise OR of all events to pend on
-#define SBP_ALL_EVENTS                        (SBP_ICALL_EVT        | \
-                                               SBP_QUEUE_EVT        | \
-                                               SBP_PERIODIC_EVT)
+#define F91_ALL_EVENTS                        (F91_ICALL_EVT        | \
+                                               F91_QUEUE_EVT        | \
+                                               F91_PERIODIC_EVT)
 
 
 // Set the register cause to the registration bit-mask
@@ -177,7 +173,7 @@ typedef struct
 {
   appEvtHdr_t hdr;  // event header.
   uint8_t *pData;  // event data
-} sbpEvt_t;
+} f91Evt_t;
 
 /*********************************************************************
  * GLOBAL VARIABLES
@@ -205,34 +201,21 @@ static Queue_Struct appMsg;
 static Queue_Handle appMsgQueue;
 
 // Task configuration
-Task_Struct sbpTask;
-Char sbpTaskStack[SBP_TASK_STACK_SIZE];
+Task_Struct f91Task;
+Char f91TaskStack[F91_TASK_STACK_SIZE];
 
 // Scan response data (max size = 31 bytes)
 static uint8_t scanRspData[] =
 {
   // complete name
-  0x14,   // length of this data
+  0x07,   // length of this data
   GAP_ADTYPE_LOCAL_NAME_COMPLETE,
+  'F',
+  '9',
+  '1',
+  '-',
   'S',
-  'i',
-  'm',
-  'p',
-  'l',
-  'e',
-  'B',
-  'L',
-  'E',
-  'P',
-  'e',
-  'r',
-  'i',
-  'p',
-  'h',
-  'e',
-  'r',
-  'a',
-  'l',
+  'W',
 
   // connection interval range
   0x05,   // length of this data
@@ -263,47 +246,42 @@ static uint8_t advertData[] =
   // in this peripheral
   0x03,   // length of this data
   GAP_ADTYPE_16BIT_MORE,      // some of the UUID's, but not all
-  LO_UINT16(SIMPLEPROFILE_SERV_UUID),
-  HI_UINT16(SIMPLEPROFILE_SERV_UUID)
+  LO_UINT16(F91_NOTIFICATION_SERVICE_UUID),
+  HI_UINT16(F91_NOTIFICATION_SERVICE_UUID)
 };
 
 // GAP GATT Attributes
-static uint8_t attDeviceName[GAP_DEVICE_NAME_LEN] = "Simple Peripheral";
+static uint8_t attDeviceName[GAP_DEVICE_NAME_LEN_KEPLER] = "F91 Kepler";
 
 
 /*********************************************************************
  * LOCAL FUNCTIONS
  */
 
-static void SimplePeripheral_init( void );
-static void SimplePeripheral_taskFxn(UArg a0, UArg a1);
+static void F91Kepler_init( void );
+static void F91Kepler_taskFxn(UArg a0, UArg a1);
 
-static uint8_t SimplePeripheral_processStackMsg(ICall_Hdr *pMsg);
-static uint8_t SimplePeripheral_processGATTMsg(gattMsgEvent_t *pMsg);
-static void SimplePeripheral_processAppMsg(sbpEvt_t *pMsg);
-static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState);
-static void SimplePeripheral_processCharValueChangeEvt(uint8_t paramID);
-static void SimplePeripheral_performPeriodicTask(void);
-static void SimplePeripheral_clockHandler(UArg arg);
+static uint8_t F91Kepler_processStackMsg(ICall_Hdr *pMsg);
+static uint8_t F91Kepler_processGATTMsg(gattMsgEvent_t *pMsg);
+static void F91Kepler_processAppMsg(f91Evt_t *pMsg);
+static void F91Kepler_processStateChangeEvt(gaprole_States_t newState);
+static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t paramID);
+static void F91Kepler_clockHandler(UArg arg);
 
-static void SimplePeripheral_passcodeCB(uint8_t *deviceAddr,
+static void F91Kepler_passcodeCB(uint8_t *deviceAddr,
                                         uint16_t connHandle,
                                         uint8_t uiInputs, uint8_t uiOutputs,
                                         uint32_t numComparison);
-static void SimplePeripheral_pairStateCB(uint16_t connHandle, uint8_t state,
+static void F91Kepler_pairStateCB(uint16_t connHandle, uint8_t state,
                                          uint8_t status);
-static void SimplePeripheral_processPairState(uint8_t state, uint8_t status);
-static void SimplePeripheral_processPasscode(uint8_t uiOutputs);
+static void F91Kepler_processPairState(uint8_t state, uint8_t status);
+static void F91Kepler_processPasscode(uint8_t uiOutputs);
 
-static void SimplePeripheral_stateChangeCB(gaprole_States_t newState);
-static void SimplePeripheral_charValueChangeCB(uint8_t paramID);
-static uint8_t SimplePeripheral_enqueueMsg(uint8_t event, uint8_t state,
+static void F91Kepler_stateChangeCB(gaprole_States_t newState);
+static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                               uint8_t *pData);
-
-static void SimplePeripheral_connEvtCB(Gap_ConnEventRpt_t *pReport);
-static void SimplePeripheral_processConnEvt(Gap_ConnEventRpt_t *pReport);
-
-
+static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport);
+static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport);
 
 /*********************************************************************
  * EXTERN FUNCTIONS
@@ -315,26 +293,19 @@ extern void AssertHandler(uint8 assertCause, uint8 assertSubcause);
  */
 
 // Peripheral GAPRole Callbacks
-static gapRolesCBs_t SimplePeripheral_gapRoleCBs =
+static gapRolesCBs_t F91Kepler_gapRoleCBs =
 {
-  SimplePeripheral_stateChangeCB     // GAPRole State Change Callbacks
+  F91Kepler_stateChangeCB     // GAPRole State Change Callbacks
 };
 
 // GAP Bond Manager Callbacks
 // These are set to NULL since they are not needed. The application
 // is set up to only perform justworks pairing.
-static gapBondCBs_t simplePeripheral_BondMgrCBs =
+static gapBondCBs_t f91Kepler_BondMgrCBs =
 {
-  SimplePeripheral_passcodeCB,  // Passcode callback
-  SimplePeripheral_pairStateCB  // Pairing / Bonding state Callback
+  F91Kepler_passcodeCB,  // Passcode callback
+  F91Kepler_pairStateCB  // Pairing / Bonding state Callback
 };
-
-// Simple GATT Profile Callbacks
-static simpleProfileCBs_t SimplePeripheral_simpleProfileCBs =
-{
-  SimplePeripheral_charValueChangeCB // Simple GATT Characteristic value change callback
-};
-
 /*********************************************************************
  * PUBLIC FUNCTIONS
  */
@@ -355,7 +326,7 @@ typedef enum
 uint32_t       connectionEventRegisterCauseBitMap = NOT_REGISTER; //see connectionEventRegisterCause_u
 
 /*********************************************************************
- * @fn      SimplePeripheral_RegistertToAllConnectionEvent()
+ * @fn      F91Kepler_RegistertToAllConnectionEvent()
  *
  * @brief   register to receive connection events for all the connection
  *
@@ -364,14 +335,14 @@ uint32_t       connectionEventRegisterCauseBitMap = NOT_REGISTER; //see connecti
  * @return @ref SUCCESS
  *
  */
-bStatus_t SimplePeripheral_RegistertToAllConnectionEvent (connectionEventRegisterCause_u connectionEventRegisterCause)
+bStatus_t F91Kepler_RegistertToAllConnectionEvent (connectionEventRegisterCause_u connectionEventRegisterCause)
 {
   bStatus_t status = SUCCESS;
 
   // in case  there is no registration for the connection event, make the registration
   if (!CONNECTION_EVENT_IS_REGISTERED)
   {
-    status = GAP_RegisterConnEventCb(SimplePeripheral_connEvtCB, GAP_CB_REGISTER, LINKDB_CONNHANDLE_ALL);
+    status = GAP_RegisterConnEventCb(F91Kepler_connEvtCB, GAP_CB_REGISTER, LINKDB_CONNHANDLE_ALL);
   }
   if(status == SUCCESS)
   {
@@ -383,7 +354,7 @@ bStatus_t SimplePeripheral_RegistertToAllConnectionEvent (connectionEventRegiste
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_UnRegistertToAllConnectionEvent()
+ * @fn      F91Kepler_UnRegistertToAllConnectionEvent()
  *
  * @brief   Unregister connection events
  *
@@ -392,7 +363,7 @@ bStatus_t SimplePeripheral_RegistertToAllConnectionEvent (connectionEventRegiste
  * @return @ref SUCCESS
  *
  */
-bStatus_t SimplePeripheral_UnRegistertToAllConnectionEvent (connectionEventRegisterCause_u connectionEventRegisterCause)
+bStatus_t F91Kepler_UnRegistertToAllConnectionEvent (connectionEventRegisterCause_u connectionEventRegisterCause)
 {
   bStatus_t status = SUCCESS;
 
@@ -400,36 +371,36 @@ bStatus_t SimplePeripheral_UnRegistertToAllConnectionEvent (connectionEventRegis
   // in case  there is no more registration for the connection event than unregister
   if (!CONNECTION_EVENT_IS_REGISTERED)
   {
-    GAP_RegisterConnEventCb(SimplePeripheral_connEvtCB, GAP_CB_UNREGISTER, LINKDB_CONNHANDLE_ALL);
+    GAP_RegisterConnEventCb(F91Kepler_connEvtCB, GAP_CB_UNREGISTER, LINKDB_CONNHANDLE_ALL);
   }
 
   return(status);
 }
 
  /*********************************************************************
- * @fn      SimplePeripheral_createTask
+ * @fn      F91Kepler_createTask
  *
- * @brief   Task creation function for the Simple Peripheral.
+ * @brief   Task creation function for the F91 Kepler Smart Watch.
  *
  * @param   None.
  *
  * @return  None.
  */
-void SimplePeripheral_createTask(void)
+void F91Kepler_createTask(void)
 {
   Task_Params taskParams;
 
   // Configure task
   Task_Params_init(&taskParams);
-  taskParams.stack = sbpTaskStack;
-  taskParams.stackSize = SBP_TASK_STACK_SIZE;
-  taskParams.priority = SBP_TASK_PRIORITY;
+  taskParams.stack = f91TaskStack;
+  taskParams.stackSize = F91_TASK_STACK_SIZE;
+  taskParams.priority = F91_TASK_PRIORITY;
 
-  Task_construct(&sbpTask, SimplePeripheral_taskFxn, &taskParams, NULL);
+  Task_construct(&f91Task, F91Kepler_taskFxn, &taskParams, NULL);
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_init
+ * @fn      F91Kepler_init
  *
  * @brief   Called during initialization and contains application
  *          specific initialization (ie. hardware initialization/setup,
@@ -440,7 +411,7 @@ void SimplePeripheral_createTask(void)
  *
  * @return  None.
  */
-static void SimplePeripheral_init(void)
+static void F91Kepler_init(void)
 {
   // ******************************************************************
   // N0 STACK API CALLS CAN OCCUR BEFORE THIS CALL TO ICall_registerApp
@@ -475,10 +446,14 @@ static void SimplePeripheral_init(void)
   appMsgQueue = Util_constructQueue(&appMsg);
 
   // Create one-shot clocks for internal periodic events.
-  Util_constructClock(&periodicClock, SimplePeripheral_clockHandler,
-                      SBP_PERIODIC_EVT_PERIOD, 0, false, SBP_PERIODIC_EVT);
+  Util_constructClock(&periodicClock, F91Kepler_clockHandler,
+                      F91_PERIODIC_EVT_PERIOD, 0, false, F91_PERIODIC_EVT);
 
-  dispHandle = Display_open(SBP_DISPLAY_TYPE, NULL);
+  
+
+  Display_init();
+  F91_LOGGER = Display_open(Display_Type_UART, NULL);
+  Display_print0(F91_LOGGER, 7, 0, ">>>LOGGER INITIALIZED<<<");
 
   // Set GAP Parameters: After a connection was established, delay in seconds
   // before sending when GAPRole_SetParameter(GAPROLE_PARAM_UPDATE_ENABLE,...)
@@ -524,7 +499,7 @@ static void SimplePeripheral_init(void)
   // Set the Device Name characteristic in the GAP GATT Service
   // For more information, see the section in the User's Guide:
   // http://software-dl.ti.com/lprf/sdg-latest/html
-  GGS_SetParameter(GGS_DEVICE_NAME_ATT, GAP_DEVICE_NAME_LEN, attDeviceName);
+  GGS_SetParameter(GGS_DEVICE_NAME_ATT, GAP_DEVICE_NAME_LEN_KEPLER, attDeviceName);
 
   // Set GAP Parameters to set the advertising interval
   // For more information, see the GAP section of the User's Guide:
@@ -573,42 +548,25 @@ static void SimplePeripheral_init(void)
   GGS_AddService(GATT_ALL_SERVICES);           // GAP GATT Service
   GATTServApp_AddService(GATT_ALL_SERVICES);   // GATT Service
   DevInfo_AddService();                        // Device Information Service
-  SimpleProfile_AddService(GATT_ALL_SERVICES); // Simple GATT Profile
 
-  // Setup the SimpleProfile Characteristic Values
-  // For more information, see the sections in the User's Guide:
-  // http://software-dl.ti.com/lprf/sdg-latest/html/
-  {
-    uint8_t charValue1 = 1;
-    uint8_t charValue2 = 2;
-    uint8_t charValue3 = 3;
-    uint8_t charValue4 = 4;
-    uint8_t charValue5[SIMPLEPROFILE_CHAR5_LEN] = { 1, 2, 3, 4, 5 };
+  //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Notification module.");
+  F91Notification_init();
 
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR1, sizeof(uint8_t),
-                               &charValue1);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR2, sizeof(uint8_t),
-                               &charValue2);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR3, sizeof(uint8_t),
-                               &charValue3);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR4, sizeof(uint8_t),
-                               &charValue4);
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR5, SIMPLEPROFILE_CHAR5_LEN,
-                               charValue5);
-  }
+  //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Clock module.");
+  F91Clock_init();
+
+  //Setup the buttons
+  F91Buttons_init();
 
   // Start the Device:
   // Please Notice that in case of wanting to use the GAPRole_SetParameter
   // function with GAPROLE_IRK or GAPROLE_SRK parameter - Perform
   // these function calls before the GAPRole_StartDevice use.
   // (because Both cases are updating the gapRole_IRK & gapRole_SRK variables).
-  VOID GAPRole_StartDevice(&SimplePeripheral_gapRoleCBs);
-
-  // Register callback with SimpleGATTprofile
-  SimpleProfile_RegisterAppCBs(&SimplePeripheral_simpleProfileCBs);
+  VOID GAPRole_StartDevice(&F91Kepler_gapRoleCBs);
 
   // Start Bond Manager and register callback
-  VOID GAPBondMgr_Register(&simplePeripheral_BondMgrCBs);
+  VOID GAPBondMgr_Register(&f91Kepler_BondMgrCBs);
 
   // Register with GAP for HCI/Host messages. This is needed to receive HCI
   // events. For more information, see the section in the User's Guide:
@@ -637,22 +595,22 @@ static void SimplePeripheral_init(void)
   HCI_LE_ReadLocalSupportedFeaturesCmd();
 #endif // !defined (USE_LL_CONN_PARAM_UPDATE)
 
-  Display_print0(dispHandle, 0, 0, "BLE Peripheral");
+  Display_print0(F91_LOGGER, 0, 0, "F91 Smart Watch");
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_taskFxn
+ * @fn      F91Kepler_taskFxn
  *
- * @brief   Application task entry point for the Simple Peripheral.
+ * @brief   Application task entry point for the F91 Kepler Smart Watch.
  *
  * @param   a0, a1 - not used.
  *
  * @return  None.
  */
-static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
+static void F91Kepler_taskFxn(UArg a0, UArg a1)
 {
   // Initialize application
-  SimplePeripheral_init();
+  F91Kepler_init();
 
   // Application main loop
   for (;;)
@@ -662,9 +620,9 @@ static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
     // Waits for an event to be posted associated with the calling thread.
     // Note that an event associated with a thread is posted when a
     // message is queued to the message receive queue of the thread
-    events = Event_pend(syncEvent, Event_Id_NONE, SBP_ALL_EVENTS,
+    events = Event_pend(syncEvent, Event_Id_NONE, F91_ALL_EVENTS,
                         ICALL_TIMEOUT_FOREVER);
-
+    
     if (events)
     {
       ICall_EntityID dest;
@@ -684,7 +642,7 @@ static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
           if (pEvt->signature != 0xffff)
           {
             // Process inter-task message
-            safeToDealloc = SimplePeripheral_processStackMsg((ICall_Hdr *)pMsg);
+            safeToDealloc = F91Kepler_processStackMsg((ICall_Hdr *)pMsg);
           }
         }
 
@@ -695,15 +653,15 @@ static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
       }
 
       // If RTOS queue is not empty, process app message.
-      if (events & SBP_QUEUE_EVT)
+      if (events & F91_QUEUE_EVT)
       {
         while (!Queue_empty(appMsgQueue))
         {
-          sbpEvt_t *pMsg = (sbpEvt_t *)Util_dequeueMsg(appMsgQueue);
+          f91Evt_t *pMsg = (f91Evt_t *)Util_dequeueMsg(appMsgQueue);
           if (pMsg)
           {
             // Process message.
-            SimplePeripheral_processAppMsg(pMsg);
+            F91Kepler_processAppMsg(pMsg);
 
             // Free the space from the message.
             ICall_free(pMsg);
@@ -711,19 +669,19 @@ static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
         }
       }
 
-      if (events & SBP_PERIODIC_EVT)
+      if (events & F91_PERIODIC_EVT)
       {
         Util_startClock(&periodicClock);
-
-        // Perform periodic application task
-        SimplePeripheral_performPeriodicTask();
       }
+
+      // Process event if available
+      F91Notification_processEvent();
     }
   }
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processStackMsg
+ * @fn      F91Kepler_processStackMsg
  *
  * @brief   Process an incoming stack message.
  *
@@ -731,7 +689,7 @@ static void SimplePeripheral_taskFxn(UArg a0, UArg a1)
  *
  * @return  TRUE if safe to deallocate incoming message, FALSE otherwise.
  */
-static uint8_t SimplePeripheral_processStackMsg(ICall_Hdr *pMsg)
+static uint8_t F91Kepler_processStackMsg(ICall_Hdr *pMsg)
 {
   uint8_t safeToDealloc = TRUE;
 
@@ -739,7 +697,7 @@ static uint8_t SimplePeripheral_processStackMsg(ICall_Hdr *pMsg)
   {
     case GATT_MSG_EVENT:
       // Process GATT message
-      safeToDealloc = SimplePeripheral_processGATTMsg((gattMsgEvent_t *)pMsg);
+      safeToDealloc = F91Kepler_processGATTMsg((gattMsgEvent_t *)pMsg);
       break;
 
     case HCI_GAP_EVENT_EVENT:
@@ -818,20 +776,20 @@ static uint8_t SimplePeripheral_processStackMsg(ICall_Hdr *pMsg)
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processGATTMsg
+ * @fn      F91Kepler_processGATTMsg
  *
  * @brief   Process GATT messages and events.
  *
  * @return  TRUE if safe to deallocate incoming message, FALSE otherwise.
  */
-static uint8_t SimplePeripheral_processGATTMsg(gattMsgEvent_t *pMsg)
+static uint8_t F91Kepler_processGATTMsg(gattMsgEvent_t *pMsg)
 {
   // See if GATT server was unable to transmit an ATT response
   if (attRsp_isAttRsp(pMsg))
   {
     // No HCI buffer was available. Let's try to retransmit the response
     // on the next connection event.
-    if( SimplePeripheral_RegistertToAllConnectionEvent(FOR_ATT_RSP) == SUCCESS)
+    if( F91Kepler_RegistertToAllConnectionEvent(FOR_ATT_RSP) == SUCCESS)
     {
       // Don't free the response message yet
       return (FALSE);
@@ -844,12 +802,12 @@ static uint8_t SimplePeripheral_processGATTMsg(gattMsgEvent_t *pMsg)
     // The app is informed in case it wants to drop the connection.
 
     // Display the opcode of the message that caused the violation.
-    Display_print1(dispHandle, 5, 0, "FC Violated: %d", pMsg->msg.flowCtrlEvt.opcode);
+    Display_print1(F91_LOGGER, 5, 0, "FC Violated: %d", pMsg->msg.flowCtrlEvt.opcode);
   }
   else if (pMsg->method == ATT_MTU_UPDATED_EVENT)
   {
     // MTU size updated
-    Display_print1(dispHandle, 5, 0, "MTU Size: %d", pMsg->msg.mtuEvt.MTU);
+    Display_print1(F91_LOGGER, 5, 0, "MTU Size: %d", pMsg->msg.mtuEvt.MTU);
   }
 
   // Free message payload. Needed only for ATT Protocol messages
@@ -860,13 +818,13 @@ static uint8_t SimplePeripheral_processGATTMsg(gattMsgEvent_t *pMsg)
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processConnEvt
+ * @fn      F91Kepler_processConnEvt
  *
  * @brief   Process connection event.
  *
  * @param pReport pointer to connection event report
  */
-static void SimplePeripheral_processConnEvt(Gap_ConnEventRpt_t *pReport)
+static void F91Kepler_processConnEvt(Gap_ConnEventRpt_t *pReport)
 {
 
   if( CONNECTION_EVENT_REGISTRATION_CAUSE(FOR_ATT_RSP))
@@ -879,14 +837,14 @@ static void SimplePeripheral_processConnEvt(Gap_ConnEventRpt_t *pReport)
     if (attRsp_sendAttRsp() == SUCCESS)
     {
         // Disable connection event end notice
-        SimplePeripheral_UnRegistertToAllConnectionEvent (FOR_ATT_RSP);
+        F91Kepler_UnRegistertToAllConnectionEvent (FOR_ATT_RSP);
     }
   }
 
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processAppMsg
+ * @fn      F91Kepler_processAppMsg
  *
  * @brief   Process an incoming callback from a profile.
  *
@@ -894,44 +852,65 @@ static void SimplePeripheral_processConnEvt(Gap_ConnEventRpt_t *pReport)
  *
  * @return  None.
  */
-static void SimplePeripheral_processAppMsg(sbpEvt_t *pMsg)
+static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
 {
   switch (pMsg->hdr.event)
   {
-    case SBP_STATE_CHANGE_EVT:
+    case F91_STATE_CHANGE_EVT:
       {
-        SimplePeripheral_processStateChangeEvt((gaprole_States_t)pMsg->
+        F91Kepler_processStateChangeEvt((gaprole_States_t)pMsg->
                                                 hdr.state);
       }
       break;
 
-    case SBP_CHAR_CHANGE_EVT:
+    case F91_NOTIFICATION_CHAR_CHANGE_EVT:
       {
-        SimplePeripheral_processCharValueChangeEvt(pMsg->hdr.state);
+        F91Kepler_processCharValueChangeEvt(SERVICE_ID_NOTIFICATION, pMsg->hdr.state);
       }
       break;
 
-    // Pairing event
-    case SBP_PAIRING_STATE_EVT:
+    case F91_CLOCK_CHAR_CHANGE_EVT:
       {
-        SimplePeripheral_processPairState(pMsg->hdr.state, *pMsg->pData);
+        F91Kepler_processCharValueChangeEvt(SERVICE_ID_CLOCK, pMsg->hdr.state);
+      }
+      break;
+
+    case F91_BUTTON_PRESS_EVT:
+      {
+        F91Buttons_processButtonPress((button_state_t *)(pMsg->pData));
+
+        ICall_free(pMsg->pData);
+        break;
+      }
+
+    case F91_SSD1306_DISPLAY_EVT:
+      {
+        ssd1306_toggle_display(false);
+        ssd1306_clear();
+        ssd1306_update();
+      }
+      break;
+    // Pairing event
+    case F91_PAIRING_STATE_EVT:
+      {
+        F91Kepler_processPairState(pMsg->hdr.state, *pMsg->pData);
 
         ICall_free(pMsg->pData);
         break;
       }
 
     // Passcode event
-    case SBP_PASSCODE_NEEDED_EVT:
+    case F91_PASSCODE_NEEDED_EVT:
       {
-        SimplePeripheral_processPasscode(*pMsg->pData);
+        F91Kepler_processPasscode(*pMsg->pData);
 
         ICall_free(pMsg->pData);
         break;
       }
 
-	case SBP_CONN_EVT:
+	case F91_CONN_EVT:
       {
-        SimplePeripheral_processConnEvt((Gap_ConnEventRpt_t *)(pMsg->pData));
+        F91Kepler_processConnEvt((Gap_ConnEventRpt_t *)(pMsg->pData));
 
         ICall_free(pMsg->pData);
         break;
@@ -944,7 +923,7 @@ static void SimplePeripheral_processAppMsg(sbpEvt_t *pMsg)
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_stateChangeCB
+ * @fn      F91Kepler_stateChangeCB
  *
  * @brief   Callback from GAP Role indicating a role state change.
  *
@@ -952,13 +931,13 @@ static void SimplePeripheral_processAppMsg(sbpEvt_t *pMsg)
  *
  * @return  None.
  */
-static void SimplePeripheral_stateChangeCB(gaprole_States_t newState)
+static void F91Kepler_stateChangeCB(gaprole_States_t newState)
 {
-  SimplePeripheral_enqueueMsg(SBP_STATE_CHANGE_EVT, newState, NULL);
+  F91Kepler_enqueueMsg(F91_STATE_CHANGE_EVT, newState, NULL);
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processStateChangeEvt
+ * @fn      F91Kepler_processStateChangeEvt
  *
  * @brief   Process a pending GAP Role state change event.
  *
@@ -966,7 +945,7 @@ static void SimplePeripheral_stateChangeCB(gaprole_States_t newState)
  *
  * @return  None.
  */
-static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
+static void F91Kepler_processStateChangeEvt(gaprole_States_t newState)
 {
 #ifdef PLUS_BROADCASTER
   static bool firstConnFlag = false;
@@ -998,8 +977,8 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
         DevInfo_SetParameter(DEVINFO_SYSTEM_ID, DEVINFO_SYSTEM_ID_LEN, systemId);
 
         // Display device address
-        Display_print0(dispHandle, 1, 0, Util_convertBdAddr2Str(ownAddress));
-        Display_print0(dispHandle, 2, 0, "Initialized");
+        Display_print0(F91_LOGGER, 1, 0, Util_convertBdAddr2Str(ownAddress));
+        Display_print0(F91_LOGGER, 2, 0, "Initialized");
 
         // Device starts advertising upon initialization of GAP
         uint8_t initialAdvertEnable = TRUE;
@@ -1010,7 +989,7 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_ADVERTISING:
-      Display_print0(dispHandle, 2, 0, "Advertising");
+      Display_print0(F91_LOGGER, 2, 0, "Advertising");
       break;
 
 #ifdef PLUS_BROADCASTER
@@ -1053,8 +1032,8 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
         // connection
         if ( linkDB_GetInfo( numActive - 1, &linkInfo ) == SUCCESS )
         {
-          Display_print1(dispHandle, 2, 0, "Num Conns: %d", (uint16_t)numActive);
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(linkInfo.addr));
+          Display_print1(F91_LOGGER, 2, 0, "Num Conns: %d", (uint16_t)numActive);
+          Display_print0(F91_LOGGER, 3, 0, Util_convertBdAddr2Str(linkInfo.addr));
         }
         else
         {
@@ -1062,8 +1041,8 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
 
           GAPRole_GetParameter(GAPROLE_CONN_BD_ADDR, peerAddress);
 
-          Display_print0(dispHandle, 2, 0, "Connected");
-          Display_print0(dispHandle, 3, 0, Util_convertBdAddr2Str(peerAddress));
+          Display_print0(F91_LOGGER, 2, 0, "Connected");
+          Display_print0(F91_LOGGER, 3, 0, Util_convertBdAddr2Str(peerAddress));
         }
 
         #ifdef PLUS_BROADCASTER
@@ -1091,7 +1070,7 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_CONNECTED_ADV:
-      Display_print0(dispHandle, 2, 0, "Connected Advertising");
+      Display_print0(F91_LOGGER, 2, 0, "Connected Advertising");
       break;
 
     case GAPROLE_WAITING:
@@ -1102,20 +1081,20 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
         attRsp_freeAttRsp(bleNotConnected);
 
         // Clear remaining lines
-        Display_clearLines(dispHandle, 3, 5);
+        Display_clearLines(F91_LOGGER, 3, 5);
         
         GAPRole_SetParameter(GAPROLE_ADVERT_ENABLED, sizeof(uint8_t), &advertReEnable);
-        Display_print0(dispHandle, 2, 0, "Advertising");
+        Display_print0(F91_LOGGER, 2, 0, "Advertising");
       }
       break;
 
     case GAPROLE_WAITING_AFTER_TIMEOUT:
       attRsp_freeAttRsp(bleNotConnected);
 
-      Display_print0(dispHandle, 2, 0, "Timed Out");
+      Display_print0(F91_LOGGER, 2, 0, "Timed Out");
 
       // Clear remaining lines
-      Display_clearLines(dispHandle, 3, 5);
+      Display_clearLines(F91_LOGGER, 3, 5);
 
       #ifdef PLUS_BROADCASTER
         // Reset flag for next connection.
@@ -1124,33 +1103,77 @@ static void SimplePeripheral_processStateChangeEvt(gaprole_States_t newState)
       break;
 
     case GAPROLE_ERROR:
-      Display_print0(dispHandle, 2, 0, "Error");
+      Display_print0(F91_LOGGER, 2, 0, "Error");
       break;
 
     default:
-      Display_clearLine(dispHandle, 2);
+      Display_clearLine(F91_LOGGER, 2);
       break;
   }
 
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_charValueChangeCB
+ * @fn      F91Kepler_notificationCharValueChangeCB
  *
- * @brief   Callback from Simple Profile indicating a characteristic
+ * @brief   Callback indicating a characteristic
  *          value change.
  *
  * @param   paramID - parameter ID of the value that was changed.
  *
  * @return  None.
  */
-static void SimplePeripheral_charValueChangeCB(uint8_t paramID)
+void F91Kepler_notificationCharValueChangeCB(uint8_t paramID)
 {
-  SimplePeripheral_enqueueMsg(SBP_CHAR_CHANGE_EVT, paramID, 0);
+  F91Kepler_enqueueMsg(F91_NOTIFICATION_CHAR_CHANGE_EVT, paramID, 0);
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processCharValueChangeEvt
+ * @fn      F91Kepler_clockCharValueChangeCB
+ *
+ * @brief   Callback indicating a characteristic
+ *          value change.
+ *
+ * @param   paramID - parameter ID of the value that was changed.
+ *
+ * @return  None.
+ */
+void F91Kepler_clockCharValueChangeCB(uint8_t paramID)
+{
+  F91Kepler_enqueueMsg(F91_CLOCK_CHAR_CHANGE_EVT, paramID, 0);
+}
+
+/*********************************************************************
+ * @fn      F91Kepler_buttonValueChangeCB
+ *
+ * @brief   Callback indicating a button
+ *          value change.
+ *
+ * @param   paramID - parameter ID of the value that was changed.
+ *
+ * @return  None.
+ */
+void F91Kepler_buttonValueChangeCB(uint8_t *pData)
+{
+  F91Kepler_enqueueMsg(F91_BUTTON_PRESS_EVT, 0, (uint8_t *) pData);
+}
+
+/*********************************************************************
+ * @fn      F91Kepler_displayStateChangeCB
+ *
+ * @brief   Callback indicating the display state has been requested.
+ *
+ * @param   None.
+ * 
+ * @return  None.
+ */
+void F91Kepler_displayStateChangeCB( void )
+{
+  F91Kepler_enqueueMsg(F91_SSD1306_DISPLAY_EVT, 0, 0);
+}
+
+/*********************************************************************
+ * @fn      F91Kepler_processCharValueChangeEvt
  *
  * @brief   Process a pending Simple Profile characteristic value change
  *          event.
@@ -1159,67 +1182,30 @@ static void SimplePeripheral_charValueChangeCB(uint8_t paramID)
  *
  * @return  None.
  */
-static void SimplePeripheral_processCharValueChangeEvt(uint8_t paramID)
+static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t paramID)
 {
-  uint8_t newValue;
-
-  switch(paramID)
+  switch (serviceID)
   {
-    case SIMPLEPROFILE_CHAR1:
-      SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR1, &newValue);
-
-      Display_print1(dispHandle, 4, 0, "Char 1: %d", (uint16_t)newValue);
+    case SERVICE_ID_NOTIFICATION:
+      F91Notification_processCharChangeEvt(paramID);
       break;
-
-    case SIMPLEPROFILE_CHAR3:
-      SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR3, &newValue);
-
-      Display_print1(dispHandle, 4, 0, "Char 3: %d", (uint16_t)newValue);
+    case SERVICE_ID_CLOCK:
+      F91Clock_processCharChangeEvt(paramID);
       break;
-
     default:
-      // should not reach here!
       break;
   }
 }
 
-/*********************************************************************
- * @fn      SimplePeripheral_performPeriodicTask
- *
- * @brief   Perform a periodic application task. This function gets called
- *          every five seconds (SBP_PERIODIC_EVT_PERIOD). In this example,
- *          the value of the third characteristic in the SimpleGATTProfile
- *          service is retrieved from the profile, and then copied into the
- *          value of the the fourth characteristic.
- *
- * @param   None.
- *
- * @return  None.
- */
-static void SimplePeripheral_performPeriodicTask(void)
-{
-  uint8_t valueToCopy;
-
-  // Call to retrieve the value of the third characteristic in the profile
-  if (SimpleProfile_GetParameter(SIMPLEPROFILE_CHAR3, &valueToCopy) == SUCCESS)
-  {
-    // Call to set that value of the fourth characteristic in the profile.
-    // Note that if notifications of the fourth characteristic have been
-    // enabled by a GATT client device, then a notification will be sent
-    // every time this function is called.
-    SimpleProfile_SetParameter(SIMPLEPROFILE_CHAR4, sizeof(uint8_t),
-                               &valueToCopy);
-  }
-}
 
 /*********************************************************************
- * @fn      SimplePeripheral_pairStateCB
+ * @fn      F91Kepler_pairStateCB
  *
  * @brief   Pairing state callback.
  *
  * @return  none
  */
-static void SimplePeripheral_pairStateCB(uint16_t connHandle, uint8_t state,
+static void F91Kepler_pairStateCB(uint16_t connHandle, uint8_t state,
                                             uint8_t status)
 {
   uint8_t *pData;
@@ -1230,62 +1216,62 @@ static void SimplePeripheral_pairStateCB(uint16_t connHandle, uint8_t state,
     *pData = status;
 
     // Queue the event.
-    SimplePeripheral_enqueueMsg(SBP_PAIRING_STATE_EVT, state, pData);
+    F91Kepler_enqueueMsg(F91_PAIRING_STATE_EVT, state, pData);
   }
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processPairState
+ * @fn      F91Kepler_processPairState
  *
  * @brief   Process the new paring state.
  *
  * @return  none
  */
-static void SimplePeripheral_processPairState(uint8_t state, uint8_t status)
+static void F91Kepler_processPairState(uint8_t state, uint8_t status)
 {
   if (state == GAPBOND_PAIRING_STATE_STARTED)
   {
-    Display_print0(dispHandle, 2, 0, "Pairing started");
+    Display_print0(F91_LOGGER, 2, 0, "Pairing started");
   }
   else if (state == GAPBOND_PAIRING_STATE_COMPLETE)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Pairing success");
+      Display_print0(F91_LOGGER, 2, 0, "Pairing success");
     }
     else
     {
-      Display_print1(dispHandle, 2, 0, "Pairing fail: %d", status);
+      Display_print1(F91_LOGGER, 2, 0, "Pairing fail: %d", status);
     }
   }
   else if (state == GAPBOND_PAIRING_STATE_BONDED)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Bonding success");
+      Display_print0(F91_LOGGER, 2, 0, "Bonding success");
     }
   }
   else if (state == GAPBOND_PAIRING_STATE_BOND_SAVED)
   {
     if (status == SUCCESS)
     {
-      Display_print0(dispHandle, 2, 0, "Bond save success");
+      Display_print0(F91_LOGGER, 2, 0, "Bond save success");
     }
     else
     {
-      Display_print1(dispHandle, 2, 0, "Bond save failed: %d", status);
+      Display_print1(F91_LOGGER, 2, 0, "Bond save failed: %d", status);
     }
   }
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_passcodeCB
+ * @fn      F91Kepler_passcodeCB
  *
  * @brief   Passcode callback.
  *
  * @return  none
  */
-static void SimplePeripheral_passcodeCB(uint8_t *deviceAddr,
+static void F91Kepler_passcodeCB(uint8_t *deviceAddr,
                                         uint16_t connHandle,
                                         uint8_t uiInputs,
                                         uint8_t uiOutputs,
@@ -1299,18 +1285,18 @@ static void SimplePeripheral_passcodeCB(uint8_t *deviceAddr,
     *pData = uiOutputs;
 
     // Enqueue the event.
-    SimplePeripheral_enqueueMsg(SBP_PASSCODE_NEEDED_EVT, 0, pData);
+    F91Kepler_enqueueMsg(F91_PASSCODE_NEEDED_EVT, 0, pData);
   }
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_processPasscode
+ * @fn      F91Kepler_processPasscode
  *
  * @brief   Process the Passcode request.
  *
  * @return  none
  */
-static void SimplePeripheral_processPasscode(uint8_t uiOutputs)
+static void F91Kepler_processPasscode(uint8_t uiOutputs)
 {
   // This app uses a default passcode. A real-life scenario would handle all
   // pairing scenarios and likely generate this randomly.
@@ -1319,7 +1305,7 @@ static void SimplePeripheral_processPasscode(uint8_t uiOutputs)
   // Display passcode to user
   if (uiOutputs != 0)
   {
-    Display_print1(dispHandle, 4, 0, "Passcode: %d", passcode);
+    Display_print1(F91_LOGGER, 4, 0, "Passcode: %d", passcode);
   }
 
   uint16_t connectionHandle;
@@ -1330,7 +1316,7 @@ static void SimplePeripheral_processPasscode(uint8_t uiOutputs)
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_clockHandler
+ * @fn      F91Kepler_clockHandler
  *
  * @brief   Handler function for clock timeouts.
  *
@@ -1338,23 +1324,23 @@ static void SimplePeripheral_processPasscode(uint8_t uiOutputs)
  *
  * @return  None.
  */
-static void SimplePeripheral_clockHandler(UArg arg)
+static void F91Kepler_clockHandler(UArg arg)
 {
   // Wake up the application.
   Event_post(syncEvent, arg);
 }
 
 /*********************************************************************
- * @fn      SimplePeripheral_connEvtCB
+ * @fn      F91Kepler_connEvtCB
  *
  * @brief   Connection event callback.
  *
  * @param pReport pointer to connection event report
  */
-static void SimplePeripheral_connEvtCB(Gap_ConnEventRpt_t *pReport)
+static void F91Kepler_connEvtCB(Gap_ConnEventRpt_t *pReport)
 {
   // Enqueue the event for processing in the app context.
-  if( SimplePeripheral_enqueueMsg(SBP_CONN_EVT, 0 ,(uint8_t *) pReport) == FALSE)
+  if( F91Kepler_enqueueMsg(F91_CONN_EVT, 0 ,(uint8_t *) pReport) == FALSE)
   {
     ICall_free(pReport);
   }
@@ -1371,10 +1357,10 @@ static void SimplePeripheral_connEvtCB(Gap_ConnEventRpt_t *pReport)
  *
  * @return  TRUE or FALSE
  */
-static uint8_t SimplePeripheral_enqueueMsg(uint8_t event, uint8_t state,
+static uint8_t F91Kepler_enqueueMsg(uint8_t event, uint8_t state,
                                            uint8_t *pData)
 {
-  sbpEvt_t *pMsg = ICall_malloc(sizeof(sbpEvt_t));
+  f91Evt_t *pMsg = ICall_malloc(sizeof(f91Evt_t));
 
   // Create dynamic pointer to message.
   if (pMsg)
@@ -1389,5 +1375,6 @@ static uint8_t SimplePeripheral_enqueueMsg(uint8_t event, uint8_t state,
 
   return FALSE;
 }
+
 /*********************************************************************
 *********************************************************************/
