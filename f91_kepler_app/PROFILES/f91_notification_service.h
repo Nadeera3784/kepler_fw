@@ -70,10 +70,7 @@ extern "C"
 #define F91_NOTIFICATION_SERVICE_CHAR2_UUID            0xA2F2
 #define F91_NOTIFICATION_SERVICE_CHAR3_UUID            0xA2F3
 
-
-#define NINEONENOTIFICATION_SERVICE                    0x00000010
-
-#define CONTACT_STREAM_LEN                             11
+#define CONTACT_STREAM_LEN                             20
 #define CONTACT_STREAM_LEN_MIN                         0
 
 

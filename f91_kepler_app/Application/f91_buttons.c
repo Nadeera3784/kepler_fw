@@ -277,6 +277,7 @@ void F91Buttons_processButtonPress(button_state_t *buttonInfo)
       if (F91Notification_getNotificationState()) {
         F91Notification_resetNotificationState();
       } else {
+        F91Notification_update(NOTIFICATION_BAR); //Add notifications if any.
         ssd1306_toggle_display(true);
         Util_restartClock(&startDispClock, DISPLAY_TIMEOUT);
       }

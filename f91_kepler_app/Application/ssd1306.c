@@ -203,7 +203,7 @@ void ssd1306_set_position(uint8_t column, uint8_t page) {
     }
 
     ssd1306_command(SET_COL_ADDR);
-    ssd1306_command(column);            // Column start address (0 = reset) //flipped
+    ssd1306_command(column);            // Column start address (0 = reset)
     // ssd1306_command(column + 32);    // Use for flipped.
     ssd1306_command(DISPLAY_WIDTH - 1); // Column end address (96 = reset)
 
@@ -561,6 +561,7 @@ void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase
  *
  */
 void ssd1306_display_full_notification(uint8_t type, char *text) {
+    bool needEllipsis = false;
     Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
 
     ssd1306_set_position(0, 0);
@@ -582,16 +583,56 @@ void ssd1306_display_full_notification(uint8_t type, char *text) {
             }
         }
     }
+    Semaphore_post(semHandle);
 
     // center the string and add to buffer
     // center within the available 69 pixels.  :|
     // each character is 6 pixels (+1 for whitespace after character)
+    // If the text is 12 characters or greater, drop the 11th character then add an ellipsis.
+    if(strlen(text)>= 12) {
+        text[11] = 0;
+        needEllipsis = true;
+    }
     double centerPadding = 12 - strlen(text);
     centerPadding = ((centerPadding/2)*6)+25;
     int space = (int)centerPadding;
-    Semaphore_post(semHandle);
+    ssd1306_display_text(text, space, CONTACT_NAME_POS_Y, false);
 
-    ssd1306_display_text(text, space, 21, false);
+    if(needEllipsis) {
+        ssd1306_display_ellipsis(ELLIPSIS_POS_X, ELLIPSIS_POS_Y, false);
+    }
+}
+
+/*********************************************************************
+ * @fn      ssd1306_display_ellipsis()
+ *
+ * @brief   Adds "..." to buffer to be displayed. Used for long contact names.
+ *
+ * @param x position in the x-plane to display the symbol.
+ * @param y poisition in the y-plane to display the symbol.
+ * @param erase represents wether to erase (true) or write (false) the symbol.
+ *
+ * @return None.
+ *
+ */
+void ssd1306_display_ellipsis(uint8_t x, uint8_t y, bool erase) {
+    Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
+
+    ssd1306_set_position(0, 0);
+    uint8_t b_x, b_y, dataByte;
+    for(b_x = 0; b_x<=4; b_x++) {
+        dataByte = ellipsis_5x7[b_x];
+        for(b_y=0; b_y<=8; b_y++){
+            if(((dataByte & 0x80) == 0x80) && !erase) {
+                ssd1306_draw_pixel(x + b_x, y + (b_y), false);
+            } else {
+                ssd1306_draw_pixel(x + b_x, y + (b_y), true);
+            }
+            dataByte<<=1; // Shift.
+        }
+    }
+
+    Semaphore_post(semHandle);
 }
 
 /*********************************************************************

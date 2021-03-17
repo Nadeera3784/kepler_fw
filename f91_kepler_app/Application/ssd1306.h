@@ -76,6 +76,11 @@ extern "C"
 #define MISSEDCALL_POS_X     44
 #define NOTIFICATIONS_POS_Y  0
 
+#define ELLIPSIS_POS_X       88
+#define ELLIPSIS_POS_Y       21
+
+#define CONTACT_NAME_POS_Y   21
+
 /*********************************************************************
  * TYPEDEFS
  */
@@ -102,6 +107,7 @@ extern void ssd1306_display_pm( uint8_t x, uint8_t y, bool erase);
 extern void ssd1306_display_small_number(uint8_t number, uint8_t x, uint8_t y, bool erase);
 extern void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, bool erase);
 extern void ssd1306_display_full_notification(uint8_t type, char *text);
+extern void ssd1306_display_ellipsis( uint8_t x, uint8_t y, bool erase);
 extern void ssd1306_toggle_display( bool state );
 extern bool ssd1306_isReady(void);
 extern bool ssd1306_getState(void);
