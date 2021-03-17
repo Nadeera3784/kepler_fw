@@ -550,7 +550,7 @@ static void F91Kepler_init(void)
   DevInfo_AddService();                        // Device Information Service
 
   //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Notification module.");
-  F91Notificaton_init();
+  F91Notification_init();
 
   //Display_print0(F91_LOGGER, 0, 0, "Starting F91 Clock module.");
   F91Clock_init();
@@ -675,7 +675,7 @@ static void F91Kepler_taskFxn(UArg a0, UArg a1)
       }
 
       // Process event if available
-      F91Notificaton_processEvent();
+      F91Notification_processEvent();
     }
   }
 }
@@ -886,6 +886,8 @@ static void F91Kepler_processAppMsg(f91Evt_t *pMsg)
     case F91_SSD1306_DISPLAY_EVT:
       {
         ssd1306_toggle_display(false);
+        ssd1306_clear();
+        ssd1306_update();
       }
       break;
     // Pairing event
@@ -1185,7 +1187,7 @@ static void F91Kepler_processCharValueChangeEvt(uint8_t serviceID, uint8_t param
   switch (serviceID)
   {
     case SERVICE_ID_NOTIFICATION:
-      F91Notificaton_processCharChangeEvt(paramID);
+      F91Notification_processCharChangeEvt(paramID);
       break;
     case SERVICE_ID_CLOCK:
       F91Clock_processCharChangeEvt(paramID);

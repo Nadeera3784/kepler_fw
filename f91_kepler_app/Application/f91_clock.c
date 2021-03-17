@@ -63,6 +63,7 @@
 #include "f91_utils.h"
 #include "f91_clock.h"
 #include "f91_clock_service.h"
+#include "f91_notification.h"
 
 
 /*********************************************************************
@@ -337,7 +338,7 @@ static void _F91Clock_internal_init(void)
 static void _F91Clock_doTime(void) {
     time_t t1;
     struct tm *ltm;
-    bool eraseFirstDigit;
+    bool eraseFirstDigit = false;
     char *dateString;
     char hour[2];
     char minute[2];
@@ -345,7 +346,7 @@ static void _F91Clock_doTime(void) {
     char month[2];
     char day[2];
     uint32_t timeInSeconds = 0;
-    
+
     t1 = time(NULL);
     t1 = t1 - _F91Clock_getTimeZone();
 
@@ -355,64 +356,67 @@ static void _F91Clock_doTime(void) {
     }
 
     ltm = localtime(&t1);
-    timeInSeconds = Seconds_get();
-    eraseFirstDigit = false;
-
-    //Handle 24hr or 12 hr time.
-    if((!_F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
-        ltm->tm_hour = ltm->tm_hour - 12;
-        ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
-    } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
-        ltm->tm_hour = 12;
-        ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
-    } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
-        ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
-    } else {
-        ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
-    }
-
-    ltoa(ltm->tm_hour, hour);
-    ltoa(ltm->tm_min, minute);
-    ltoa(ltm->tm_sec, second);
-    ltoa(ltm->tm_mon + 1, month);
-    ltoa(ltm->tm_mday, day);
-
-    dateString = strcat(strcat(month,"/"),day);
-    ssd1306_display_semicolon(SEM_CLN_POS_X, SEM_CLN_POS_Y, false);
-    ssd1306_display_text("000000", DATE_POS_X, DATE_POS_Y, true); // erase all date field first
-    ssd1306_display_text(dateString, 95 - (strlen(dateString)*6), 1, false); // display date, right aligned
-
-    if(ltm->tm_hour<10){
-        hour[1]=hour[0];
-        hour[0]='0';
-        // Don't display the first hour digit.
-        eraseFirstDigit = true;
-    }
-
-    if(ltm->tm_min<10){
-        minute[1]=minute[0];
-        minute[0]='0';
-    }
-
-    if(ltm->tm_sec<10){
-        second[1]=second[0];
-        second[0]='0';
-    }
-    //Hour
-    ssd1306_display_number(hour[0]-'0', HR_1_POS_X, HR_MIN_POS_Y, eraseFirstDigit);
-    ssd1306_display_number(hour[1]-'0', HR_2_POS_X, HR_MIN_POS_Y, false);
-    //Minutes
-    ssd1306_display_number(minute[0]-'0', MIN_1_POS_X, HR_MIN_POS_Y, false);
-    ssd1306_display_number(minute[1]-'0', MIN_2_POS_X, HR_MIN_POS_Y, false);
-    //Seconds
-    ssd1306_display_small_number(second[0]-'0', SEC_1_POS_X, SEC_POS_Y, false);
-    ssd1306_display_small_number(second[1]-'0', SEC_2_POS_X, SEC_POS_Y, false);
-
-    //Update Display
-    ssd1306_update();
-
+    
     //Update service
+    timeInSeconds = Seconds_get();
     F91_clock_service_SetParameter(F91_CLOCK_SERVICE_CHAR1, sizeof(uint32_t), &timeInSeconds);
+
+    //Only update the time details for the display if the display is on AND
+    // there isn't a full screen notification being displayed.
+    if((ssd1306_getState()) && (!F91Notification_getNotificationState())){
+        //Handle 24hr or 12 hr time.
+        if((!_F91Clock_getTimeMode()) && (ltm->tm_hour>=13)){
+            ltm->tm_hour = ltm->tm_hour - 12;
+            ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
+        } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 0)){
+            ltm->tm_hour = 12;
+            ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
+        } else if((!_F91Clock_getTimeMode()) && (ltm->tm_hour == 12)){
+            ssd1306_display_pm(PM_POS_X, PM_POS_Y, false);
+        } else {
+            ssd1306_display_pm(PM_POS_X, PM_POS_Y, true);
+        }
+
+        ltoa(ltm->tm_hour, hour);
+        ltoa(ltm->tm_min, minute);
+        ltoa(ltm->tm_sec, second);
+        ltoa(ltm->tm_mon + 1, month);
+        ltoa(ltm->tm_mday, day);
+
+        dateString = strcat(strcat(month,"/"),day);
+        ssd1306_display_semicolon(SEM_CLN_POS_X, SEM_CLN_POS_Y, false);
+        ssd1306_display_text("000000", DATE_POS_X, DATE_POS_Y, true); // erase all date field first
+        ssd1306_display_text(dateString, 95 - (strlen(dateString)*6), 1, false); // display date, right aligned
+
+        if(ltm->tm_hour<10){
+            hour[1]=hour[0];
+            hour[0]='0';
+            // Don't display the first hour digit.
+            eraseFirstDigit = true;
+        }
+
+        if(ltm->tm_min<10){
+            minute[1]=minute[0];
+            minute[0]='0';
+        }
+
+        if(ltm->tm_sec<10){
+            second[1]=second[0];
+            second[0]='0';
+        }
+        //Hour
+        ssd1306_display_number(hour[0]-'0', HR_1_POS_X, HR_MIN_POS_Y, eraseFirstDigit);
+        ssd1306_display_number(hour[1]-'0', HR_2_POS_X, HR_MIN_POS_Y, false);
+        //Minutes
+        ssd1306_display_number(minute[0]-'0', MIN_1_POS_X, HR_MIN_POS_Y, false);
+        ssd1306_display_number(minute[1]-'0', MIN_2_POS_X, HR_MIN_POS_Y, false);
+        //Seconds
+        ssd1306_display_small_number(second[0]-'0', SEC_1_POS_X, SEC_POS_Y, false);
+        ssd1306_display_small_number(second[1]-'0', SEC_2_POS_X, SEC_POS_Y, false);
+
+        //Update Display
+        ssd1306_update();
+    }
 }
 
 /*********************************************************************

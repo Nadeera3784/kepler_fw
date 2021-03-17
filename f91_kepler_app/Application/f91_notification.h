@@ -46,38 +46,32 @@ extern "C"
 /*
  * Initialize notifications module
  */
-extern void F91Notificaton_init(void);
+extern void F91Notification_init(void);
 
 /*
  * Task Event Processor for characteristic changes
  */
-void F91Notificaton_processCharChangeEvt(uint8_t paramID);
+extern void F91Notification_processCharChangeEvt(uint8_t paramID);
 
 /*
  * Task Event Processor for notifications module
  */
-extern void F91Notificaton_processEvent(void);
+extern void F91Notification_processEvent(void);
 
-/*
- * Reset notification module
- */
-extern void F91Notificaton_reset(void);
-
-/*
- * Set specific notification
- */
-extern void F91Notificaton_SetNotification(uint8_t type, uint8_t notification);
-
-
-/*
- * Set specific notification
- */
-extern void F91Notificaton_SetFullNotification(uint8_t type, char* notification);
 /*
  * Update notifications
  */
-extern void F91Notificaton_Update(uint8_t type);
+extern void F91Notification_update(uint8_t type);
 
+/*
+ * Returns wether a full screen notification is being shown.
+ */
+extern bool F91Notification_getNotificationState( void );
+
+/*
+ * Reset full screen notifcation and one shot clock.
+ */
+extern void F91Notification_resetNotificationState( void );
 
 /*********************************************************************
 *********************************************************************/

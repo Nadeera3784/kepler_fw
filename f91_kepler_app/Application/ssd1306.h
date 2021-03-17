@@ -104,6 +104,7 @@ extern void ssd1306_display_notification(uint8_t icon, uint8_t x, uint8_t y, boo
 extern void ssd1306_display_full_notification(uint8_t type, char *text);
 extern void ssd1306_toggle_display( bool state );
 extern bool ssd1306_isReady(void);
+extern bool ssd1306_getState(void);
 
 /*********************************************************************
 *********************************************************************/

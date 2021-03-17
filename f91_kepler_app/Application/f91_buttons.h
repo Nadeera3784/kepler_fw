@@ -70,6 +70,7 @@ typedef struct
 
 extern void F91Buttons_init( void );
 extern void F91Buttons_processButtonPress(button_state_t *buttonInfo);
+extern void F91Buttons_resetOneShot( void );
 
 /*********************************************************************
 *********************************************************************/

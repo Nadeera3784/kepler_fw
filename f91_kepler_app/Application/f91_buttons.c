@@ -26,6 +26,7 @@
 #include "f91_utils.h"
 #include "f91_kepler.h"
 #include "f91_buttons.h"
+#include "f91_notification.h"
 
 #include <ti/display/Display.h>
 #include <ti/sysbios/BIOS.h>
@@ -270,12 +271,30 @@ void F91Buttons_processButtonPress(button_state_t *buttonInfo)
     Display_print1(F91_LOGGER, 8, 0, "STATE: %d", buttonInfo->state);
 
     //If button (14 for now) is pressed, toggle display ON and start the one-shot clock for 5 seconds.
+    // Unless there is a full screen display. In that case just turn the display off as to clear the notification.
     // This one shot clock then triggers an event to turn display off.
     if (buttonInfo->pinId == 14) {
+      if (F91Notification_getNotificationState()) {
+        F91Notification_resetNotificationState();
+      } else {
         ssd1306_toggle_display(true);
         Util_restartClock(&startDispClock, DISPLAY_TIMEOUT);
+      }
     }
 }
+
+/*********************************************************************
+ * @fn      F91Buttons_resetOneShot
+ *
+ * @brief   Reset the one shot clock that was displaying the time (This is to override the clock with full screen notifcations).
+ *
+ * @param none
+ */
+void F91Buttons_resetOneShot(void)
+{
+  Util_stopClock(&startDispClock);
+}
+
 
 /*********************************************************************
 *********************************************************************/

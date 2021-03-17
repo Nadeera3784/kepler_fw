@@ -89,7 +89,7 @@ uint8_t command_buffer[2];
 uint8_t txBuffer[1];
 uint8_t rxBuffer[2];
 bool displayInitialized = false;
-uint8_t displayState = 0;
+bool displayState = false;
 
 I2C_Handle              i2c_connection;
 I2C_Params              i2c_params;
@@ -608,10 +608,10 @@ void ssd1306_toggle_display ( bool state ) {
     Semaphore_pend(semHandle, BIOS_WAIT_FOREVER);
     if (state) {
         ssd1306_command(SET_DISP_ON);
-        displayState = 1;
+        displayState = true;
     } else {
         ssd1306_command(SET_DISP_OFF);
-        displayState = 0;
+        displayState = false;
     }
     Semaphore_post(semHandle);
 }
@@ -629,6 +629,21 @@ void ssd1306_toggle_display ( bool state ) {
 bool ssd1306_isReady() {
     return displayInitialized;
 }
+
+/*********************************************************************
+ * @fn      ssd1306_getState()
+ *
+ * @brief   Used to check if the SSD1306 is ON.
+ *
+ * @param None.
+ *
+ * @return true if display is ON, false otherwise.
+ *
+ */
+bool ssd1306_getState() {
+    return displayState;
+}
+
 
 /*********************************************************************
 *********************************************************************/
