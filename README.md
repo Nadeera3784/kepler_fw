@@ -21,6 +21,8 @@ Currently the following services and characteristics are present on the FW.
     - A uint16 that sets the current time zone, represented by seconds west of UTC.
   - `FA35B2F3-7989-11EB-9439-0242AC130002` **Time Mode** (read, write)
     - A uint8 that sets the time mode to display either 12hr (0x00) or 24hr (0x01) mode.
+  - `FA35B2F4-7989-11EB-9439-0242AC130002` **DST** (read, write)
+    - A uint8 that sets daylight savings time (0x00) normal or (0x01) dst.
 
 ## Compiling
 

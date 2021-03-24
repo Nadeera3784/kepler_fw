@@ -167,7 +167,7 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
       // Characteristic Value 1
       {
         { ATT_UUID_SIZE, f91_notification_serviceChar1UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_READ | GATT_PERMIT_WRITE,
         0,
         &f91NotificationServiceChar1
       },
@@ -188,7 +188,7 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
       // Characteristic Value 2
       {
         { ATT_UUID_SIZE, f91_notification_serviceChar2UUID },
-        GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_WRITE,
         0,
         f91NotificationServiceChar2
       },
@@ -209,7 +209,7 @@ static gattAttribute_t f91_notification_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTE
       // Characteristic Value 3
       {
         { ATT_UUID_SIZE, f91_notification_serviceChar3UUID },
-        GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_WRITE,
         0,
         f91NotificationServiceChar3
       },
