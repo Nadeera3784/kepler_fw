@@ -174,7 +174,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
       // Characteristic Value 1
       {
         { ATT_UUID_SIZE, f91_clock_serviceChar1UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_READ | GATT_PERMIT_AUTHEN_WRITE,
         0,
          (uint8_t *)&f91ClockServiceChar1
       },
@@ -196,7 +196,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
       // Characteristic Value 2
       {
         { ATT_UUID_SIZE, f91_clock_serviceChar2UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_READ | GATT_PERMIT_AUTHEN_WRITE,
         0,
          (uint8_t *)&f91ClockServiceChar2
       },
@@ -218,7 +218,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
       // Characteristic Value 3
       {
         { ATT_UUID_SIZE, f91_clock_serviceChar3UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_READ | GATT_PERMIT_AUTHEN_WRITE,
         0,
         &f91ClockServiceChar3
       },
@@ -240,7 +240,7 @@ static gattAttribute_t f91_clock_serviceAttrTbl[SERVAPP_NUM_ATTR_SUPPORTED] =
       // Characteristic Value 4
       {
         { ATT_UUID_SIZE, f91_clock_serviceChar4UUID },
-        GATT_PERMIT_READ | GATT_PERMIT_WRITE,
+        GATT_PERMIT_AUTHEN_READ | GATT_PERMIT_AUTHEN_WRITE,
         0,
         &f91ClockServiceChar4
       },
