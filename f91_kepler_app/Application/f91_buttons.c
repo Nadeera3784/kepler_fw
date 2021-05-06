@@ -46,6 +46,10 @@
  */
 #define DISPLAY_TIMEOUT 5000 //5 seconds 
 
+#define BOARD_BUTTON_0  0x0000000F  // IO Id 15
+#define BOARD_BUTTON_1  0x00000019  // IO Id 25
+#define BOARD_BUTTON_2  0x0000001A  // IO Id 26
+
 /*********************************************************************
  * TYPEDEFS
  */
@@ -67,8 +71,8 @@ static PIN_State buttonPinState;
  *   - Buttons interrupts are configured to trigger on falling edge.
  */
 PIN_Config buttonPinTable[] = {
-    Board_BUTTON0 | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
-    Board_BUTTON1 | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
+    BOARD_BUTTON_0 | PIN_INPUT_EN | PIN_PULLDOWN | PIN_IRQ_NEGEDGE,
+    BOARD_BUTTON_1 | PIN_INPUT_EN | PIN_PULLDOWN | PIN_IRQ_NEGEDGE,
     PIN_TERMINATE
 };
 
@@ -115,17 +119,17 @@ static void F91Buttons_buttonDebounceSwiFxn(UArg buttonId)
   if (buttonPinVal)
   {
     // Enable negative edge interrupts to wait for press
-    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_NEGEDGE);
+    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_POSEDGE);
   }
   else
   {
-    // Enable positive edge interrupts to wait for relesae
-    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_POSEDGE);
+    // Enable positive edge interrupts to wait for release
+    PIN_setConfig(buttonPinHandle, PIN_BM_IRQ, buttonId | PIN_IRQ_NEGEDGE);
   }
 
   switch(buttonId)
   {
-    case Board_BUTTON0:
+    case BOARD_BUTTON_0:
       if (buttonPinVal && button0State)
       {
         // Button was released
@@ -140,7 +144,7 @@ static void F91Buttons_buttonDebounceSwiFxn(UArg buttonId)
       }
       break;
 
-    case Board_BUTTON1:
+    case BOARD_BUTTON_1:
       if (buttonPinVal && button1State)
       {
         // Button was released
@@ -189,10 +193,10 @@ static void F91Buttons_buttonCallbackFxn(PIN_Handle handle, PIN_Id pinId)
   // Start debounce timer
   switch (pinId)
   {
-    case Board_BUTTON0:
+    case BOARD_BUTTON_0:
       Clock_start(Clock_handle(&button0DebounceClock));
       break;
-    case Board_BUTTON1:
+    case BOARD_BUTTON_1:
       Clock_start(Clock_handle(&button1DebounceClock));
       break;
   }
@@ -239,7 +243,7 @@ void F91Buttons_init( void ) {
 
     // Both clock objects use the same callback, so differentiate on argument
     // given to the callback in Swi context
-    clockParams.arg = Board_BUTTON0;
+    clockParams.arg = BOARD_BUTTON_0;
 
     // Initialize to 50 ms timeout when Clock_start is called.
     // Timeout argument is in ticks, so convert from ms to ticks via tickPeriod.
@@ -248,7 +252,7 @@ void F91Buttons_init( void ) {
                     &clockParams);
 
     // Second button
-    clockParams.arg = Board_BUTTON1;
+    clockParams.arg = BOARD_BUTTON_1;
     Clock_construct(&button1DebounceClock, F91Buttons_buttonDebounceSwiFxn,
                     50 * (1000/Clock_tickPeriod),
                     &clockParams);
@@ -273,7 +277,7 @@ void F91Buttons_processButtonPress(button_state_t *buttonInfo)
     //If button (14 for now) is pressed, toggle display ON and start the one-shot clock for 5 seconds.
     // Unless there is a full screen display. In that case just turn the display off as to clear the notification.
     // This one shot clock then triggers an event to turn display off.
-    if (buttonInfo->pinId == 14) {
+    if (buttonInfo->pinId == 15) {
       if (F91Notification_getNotificationState()) {
         F91Notification_resetNotificationState();
       } else {
