@@ -47,7 +47,11 @@
 #define DISPLAY_WIDTH       0x60 //0x60 //96 pixels //0x80 (use for flipped) //128 pixels
 
 // SSD1306 Address
-#define SSD1306_I2C_ADDR   0x3d// 0x3c (dev board) or 0x3d
+#ifdef IS_DEV_BOARD
+    #define SSD1306_I2C_ADDR    0x3c
+#else
+    #define SSD1306_I2C_ADDR    0x3d
+#endif
 
 // Register Definitions
 #define SET_DISP_OFF        0xae
