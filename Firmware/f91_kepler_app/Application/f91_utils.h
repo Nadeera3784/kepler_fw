@@ -51,6 +51,7 @@
 #include <ti/sysbios/knl/Semaphore.h>
 #include <ti/sysbios/knl/Mailbox.h>
 
+#define IS_DEV_BOARD
 
 /*********************************************************************
  * CONSTANTS
