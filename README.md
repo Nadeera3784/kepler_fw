@@ -16,7 +16,7 @@ This repo contains all the firmware, hardware, and completely unfinished softwar
 - Only one button currently supported to wake screen.
 - Battery life of roughly 15 days with waking screen several times a day.
 
-## To-do / imporvements:
+## To-do / improvements:
 - Create phone app to handle sending ble calls automatically.
 - Add ability to set time through buttons.
 - Add sound capabilities. 
