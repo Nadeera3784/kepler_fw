@@ -8,12 +8,12 @@ The PCB was designed using [Diptrace](https://diptrace.com/). The free version w
 My first design for the board used FPC connectors for the display (4 pin) as well as one for programming/debugging (11 pin). This was later changed to use the Molex board to board connector for the display and small connection points across the PCB for programming/debugging. These changes were made to save room and make it easier to not have to solder and unsolder an FPC connector for programming/debugging. The connection points are hard to see in the real images, but are visible in the render seen in Figure 3 below. The PCB is only two layers and was printed by [OSHPark](https://oshpark.com/) at 0.8mm. This thickness was a little thicker than the original 0.6mm board, but at the price and speed of the service it couldn't be beat. Yes, you can get 0.6mm boards from services such as PCB Way for cheaper, but the shipping costs a ton (at least at this time) and takes forever. The TI design requirements also suggest an 0.8mm board if memory serves me right...
 
 <p align="center">
-  <img src="images/old-new.jpg" alt="Old & New Design" width="500"/>
-  <br><b>Figure 1</b>: Old design on the left and new design on the right.
+  <img src="images/old-new.jpg" alt="First & New Design" width="500"/>
+  <br><b>Figure 1</b>: First design on the left and new design on the right.
 </p>
 <p align="center">
-  <img src="images/old-new-back.jpg" alt="Back of Old & New Design" width="500"/>
-  <br><b>Figure 2</b>: Back of old and new design.
+  <img src="images/old-new-back.jpg" alt="Back of First & New Design" width="500"/>
+  <br><b>Figure 2</b>: Back of first and new design.
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@ My first design for the board used FPC connectors for the display (4 pin) as wel
 ## Display Adapter
 The display adapter was designed to take the 28 pins of the SSD1306 OLED display and bring them down to an easy to use I2C interface. My original design was intended to pair with the FPC connector on the main PCB, but it was too bulky. The second design is much slimmer, easy to manage, and uses a molex board to board connector which so far has worked much better than the FPC connection. One thing to note is that it was an absolute pain to solder those molex connections by hand. 
 <p align="center">
-  <img src="images/old-new-display.jpg" alt="Old & New Display Design" width="500"/>
+  <img src="images/old-new-display.jpg" alt="First & New Display Design" width="500"/>
   <br><b>Figure 4</b>: First display adapter and second design.
 </p>
 
