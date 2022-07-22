@@ -32,3 +32,7 @@ This repo contains all the firmware, hardware, and completely unfinished softwar
 <p align="center">
   <img src="Hardware/images/text_from.jpg" alt="Old & New Display Design" width="500"/>
 </p>
+
+
+### Contact
+devPegor@gmail.com
